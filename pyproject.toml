@@ -12,6 +12,8 @@ dependencies = [
     "alembic>=1.13.0",
     "pydantic-settings>=2.1.0",
     "python-dotenv>=1.0.0",
+    "pgvector>=0.4.1",
+    "psycopg2-binary>=2.9.11",
 ]
 
 [project.optional-dependencies]

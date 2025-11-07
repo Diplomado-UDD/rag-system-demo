@@ -12,9 +12,12 @@ from alembic import context
 config = context.config
 
 # Set database URL from environment variable
+# Convert async URL to sync for Alembic migrations
 database_url = os.getenv("DATABASE_URL")
 if database_url:
-    config.set_main_option("sqlalchemy.url", database_url)
+    # Replace asyncpg with psycopg2 for sync operations
+    sync_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
+    config.set_main_option("sqlalchemy.url", sync_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
