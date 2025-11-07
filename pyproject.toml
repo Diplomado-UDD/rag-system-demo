@@ -14,6 +14,9 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "pgvector>=0.4.1",
     "psycopg2-binary>=2.9.11",
+    "tiktoken>=0.12.0",
+    "pdfplumber>=0.11.7",
+    "pypdf2>=3.0.1",
 ]
 
 [project.optional-dependencies]
@@ -38,3 +41,8 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
+
+[dependency-groups]
+dev = [
+    "reportlab>=4.4.4",
+]
