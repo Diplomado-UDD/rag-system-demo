@@ -17,6 +17,7 @@ dependencies = [
     "tiktoken>=0.12.0",
     "pdfplumber>=0.11.7",
     "pypdf2>=3.0.1",
+    "langchain-text-splitters>=1.0.0",
 ]
 
 [project.optional-dependencies]
