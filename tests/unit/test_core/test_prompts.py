@@ -1,11 +1,14 @@
 """Tests for Spanish prompt templates."""
 
+from uuid import uuid4
+
 from src.core.prompts import (
     REFUSAL_MESSAGE,
     SYSTEM_PROMPT_TEMPLATE,
     format_context_from_chunks,
     format_prompt,
 )
+from src.models.chunk import Chunk
 
 
 def test_system_prompt_template_has_context_placeholder():
@@ -68,9 +71,18 @@ def test_format_prompt_spanish_structure():
 
 def test_format_context_from_chunks_single_chunk():
     """Test formatting context from single chunk."""
-    chunks = [{"content": "Este es el contenido", "page_number": 5}]
+    doc_id = uuid4()
+    chunk = Chunk(
+        id=uuid4(),
+        document_id=doc_id,
+        content="Este es el contenido",
+        page_number=5,
+        chunk_index=0,
+        word_count=4,
+    )
+    chunks_with_scores = [(chunk, 0.95)]
 
-    context = format_context_from_chunks(chunks)
+    context = format_context_from_chunks(chunks_with_scores)
 
     assert "Fragmento 1" in context
     assert "Página 5" in context
@@ -79,13 +91,44 @@ def test_format_context_from_chunks_single_chunk():
 
 def test_format_context_from_chunks_multiple_chunks():
     """Test formatting context from multiple chunks."""
-    chunks = [
-        {"content": "Primer fragmento", "page_number": 1},
-        {"content": "Segundo fragmento", "page_number": 2},
-        {"content": "Tercer fragmento", "page_number": 3},
+    doc_id = uuid4()
+    chunks_with_scores = [
+        (
+            Chunk(
+                id=uuid4(),
+                document_id=doc_id,
+                content="Primer fragmento",
+                page_number=1,
+                chunk_index=0,
+                word_count=2,
+            ),
+            0.95,
+        ),
+        (
+            Chunk(
+                id=uuid4(),
+                document_id=doc_id,
+                content="Segundo fragmento",
+                page_number=2,
+                chunk_index=1,
+                word_count=2,
+            ),
+            0.85,
+        ),
+        (
+            Chunk(
+                id=uuid4(),
+                document_id=doc_id,
+                content="Tercer fragmento",
+                page_number=3,
+                chunk_index=2,
+                word_count=2,
+            ),
+            0.75,
+        ),
     ]
 
-    context = format_context_from_chunks(chunks)
+    context = format_context_from_chunks(chunks_with_scores)
 
     assert "Fragmento 1" in context
     assert "Fragmento 2" in context
@@ -106,12 +149,33 @@ def test_format_context_from_chunks_empty():
 
 def test_format_context_preserves_spanish_text():
     """Test that context formatting preserves Spanish characters."""
-    chunks = [
-        {"content": "Información sobre el año pasado", "page_number": 1},
-        {"content": "El niño comió mañana", "page_number": 2},
+    doc_id = uuid4()
+    chunks_with_scores = [
+        (
+            Chunk(
+                id=uuid4(),
+                document_id=doc_id,
+                content="Información sobre el año pasado",
+                page_number=1,
+                chunk_index=0,
+                word_count=5,
+            ),
+            0.9,
+        ),
+        (
+            Chunk(
+                id=uuid4(),
+                document_id=doc_id,
+                content="El niño comió mañana",
+                page_number=2,
+                chunk_index=1,
+                word_count=4,
+            ),
+            0.8,
+        ),
     ]
 
-    context = format_context_from_chunks(chunks)
+    context = format_context_from_chunks(chunks_with_scores)
 
     assert "ñ" in context
     assert "ó" in context

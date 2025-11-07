@@ -1,6 +1,6 @@
 """Vector repository for similarity search operations."""
 
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy import delete, select, text

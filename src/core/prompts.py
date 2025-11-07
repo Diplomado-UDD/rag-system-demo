@@ -32,23 +32,23 @@ def format_prompt(context: str, question: str) -> str:
     return full_prompt
 
 
-def format_context_from_chunks(chunks: list[dict]) -> str:
+def format_context_from_chunks(chunks_with_scores: list[tuple]) -> str:
     """
     Format retrieved chunks into context string.
 
     Args:
-        chunks: List of chunk dictionaries with 'content' and 'page_number'
+        chunks_with_scores: List of (chunk, score) tuples from retrieval
 
     Returns:
         Formatted context string with page references
     """
-    if not chunks:
+    if not chunks_with_scores:
         return "No se encontró información relevante en el documento."
 
     context_parts = []
-    for i, chunk in enumerate(chunks, 1):
-        page_num = chunk.get("page_number", "?")
-        content = chunk.get("content", "")
+    for i, (chunk, score) in enumerate(chunks_with_scores, 1):
+        page_num = chunk.page_number
+        content = chunk.content
         context_parts.append(f"[Fragmento {i} - Página {page_num}]\n{content}")
 
     return "\n\n".join(context_parts)
