@@ -19,6 +19,7 @@ dependencies = [
     "pypdf2>=3.0.1",
     "langchain-text-splitters>=1.0.0",
     "openai>=2.7.1",
+    "python-multipart>=0.0.20",
 ]
 
 [project.optional-dependencies]
