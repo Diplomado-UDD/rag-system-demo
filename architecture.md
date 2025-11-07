@@ -1,0 +1,744 @@
+# RAG System Demo - Architecture
+
+## Overview
+
+A RAG (Retrieval-Augmented Generation) system designed to process Spanish PDF documents and answer questions in Chilean Spanish. The system extracts, vectorizes, and stores document content, then uses semantic search to provide accurate, citation-backed answers while preventing hallucinations on out-of-scope queries.
+
+## Technology Stack
+
+- **Backend**: Python 3.12+
+- **API Framework**: FastAPI
+- **Database**: PostgreSQL 16+ with pgvector extension
+- **Environment Management**: uv
+- **Containerization**: Docker & Docker Compose
+- **LLM Provider**: OpenAI/Anthropic (with Spanish language support)
+- **Embeddings**: Multilingual embeddings (e.g., `text-embedding-3-small`)
+- **PDF Processing**: PyPDF2, pdfplumber
+- **Vector Search**: pgvector (cosine similarity)
+
+---
+
+## Project Structure
+
+```
+rag-system-demo/
+├── .git/
+├── .gitignore
+├── .python-version              # 3.12
+├── README.md
+├── architecture.md              # This file
+├── user-stories.md
+├── pyproject.toml               # uv configuration
+├── uv.lock
+│
+├── docker-compose.yml           # Multi-container setup
+├── Dockerfile                   # API container
+├── .env.example
+├── .env                         # Gitignored
+│
+├── alembic/                     # DB migrations
+│   ├── versions/
+│   ├── env.py
+│   └── alembic.ini
+│
+├── src/
+│   ├── __init__.py
+│   │
+│   ├── api/                     # FastAPI application
+│   │   ├── __init__.py
+│   │   ├── main.py              # App entry point
+│   │   ├── dependencies.py      # DI container
+│   │   ├── middleware.py        # CORS, error handling
+│   │   └── routes/
+│   │       ├── __init__.py
+│   │       ├── health.py        # Health checks
+│   │       ├── documents.py     # Upload & processing status
+│   │       └── queries.py       # RAG Q&A endpoint
+│   │
+│   ├── core/                    # Core configuration
+│   │   ├── __init__.py
+│   │   ├── config.py            # Settings (env vars)
+│   │   ├── logging.py           # Logging setup
+│   │   └── prompts.py           # LLM prompt templates (Spanish)
+│   │
+│   ├── services/                # Business logic
+│   │   ├── __init__.py
+│   │   ├── pdf_service.py       # PDF text extraction
+│   │   ├── chunking_service.py  # Text splitting
+│   │   ├── embedding_service.py # Vector generation
+│   │   ├── retrieval_service.py # Similarity search
+│   │   ├── llm_service.py       # LLM calls (OpenAI/Anthropic)
+│   │   └── rag_service.py       # Orchestrates RAG pipeline
+│   │
+│   ├── models/                  # SQLAlchemy ORM
+│   │   ├── __init__.py
+│   │   ├── document.py          # Document metadata
+│   │   ├── chunk.py             # Text chunks + embeddings
+│   │   └── query_log.py         # Query history
+│   │
+│   ├── schemas/                 # Pydantic models
+│   │   ├── __init__.py
+│   │   ├── document.py          # Upload/status DTOs
+│   │   ├── query.py             # Query request/response
+│   │   └── common.py            # Shared schemas
+│   │
+│   ├── repositories/            # Data access layer
+│   │   ├── __init__.py
+│   │   ├── base.py              # Base repository
+│   │   ├── document_repo.py     # Document CRUD
+│   │   └── vector_repo.py       # Vector search queries
+│   │
+│   └── utils/                   # Helpers
+│       ├── __init__.py
+│       ├── text_processing.py   # Cleaning, normalization
+│       ├── validators.py        # File validation
+│       └── exceptions.py        # Custom exceptions
+│
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py              # Pytest fixtures
+│   ├── unit/
+│   │   ├── test_services/
+│   │   └── test_utils/
+│   ├── integration/
+│   │   ├── test_api/
+│   │   └── test_rag_flow.py
+│   └── fixtures/
+│       └── sample.pdf           # Test PDF
+│
+└── scripts/
+    ├── init_db.sh               # Initialize pgvector
+    └── seed_sample.py           # Load test document
+```
+
+---
+
+## Component Descriptions
+
+### 1. API Layer (`src/api/`)
+
+**Purpose**: HTTP interface for document uploads and queries
+
+#### `main.py`
+- FastAPI app initialization
+- CORS middleware (allow frontend origin)
+- Global exception handlers
+- Startup/shutdown events (DB connection pool)
+
+#### `routes/documents.py`
+- `POST /documents/upload`: Accept PDF file
+- `GET /documents/{id}/status`: Check processing status
+- `GET /documents/{id}`: Get document metadata
+- `DELETE /documents/{id}`: Remove document
+
+#### `routes/queries.py`
+- `POST /queries`: Submit question, get answer with citations
+- Response includes: answer text, confidence, source chunks, page numbers
+
+#### `routes/health.py`
+- `GET /health`: System health check
+- `GET /health/ready`: Readiness probe (DB + LLM API connectivity)
+
+---
+
+### 2. Services Layer (`src/services/`)
+
+**Purpose**: Core business logic implementing user stories
+
+#### **pdf_service.py** (Story 1.1 - 1.4)
+- Extract text from uploaded PDF
+- Handle errors: invalid format, corrupted files, oversized
+- Return structured text with page numbers
+- Libraries: `pdfplumber` (primary), fallback to `PyPDF2`
+
+#### **chunking_service.py** (Story 2.3)
+- Split document into semantic chunks (500-800 tokens)
+- Preserve context with overlap (100 tokens)
+- Maintain page number references for citations
+- Strategy: Sentence-aware splitting
+
+#### **embedding_service.py** (Story 2.3)
+- Generate multilingual embeddings
+- Model: OpenAI `text-embedding-3-small` (supports Spanish)
+- Batch processing for efficiency
+- Normalize vectors for cosine similarity
+
+#### **retrieval_service.py** (Story 2.5)
+- Perform vector similarity search (top-k=5)
+- Return chunks with scores and page numbers
+- Filter by minimum similarity threshold (>0.7)
+- Re-ranking based on page proximity (optional)
+
+#### **llm_service.py** (Stories 2.2, 2.4, 3.1, 3.2)
+- Interface with LLM API (GPT-4 or Claude 3.5 Sonnet)
+- System prompt in Spanish enforcing:
+  - Answer ONLY from provided context
+  - Respond in clear Spanish
+  - Include page citations
+  - Refuse out-of-scope questions politely
+- Token counting and cost tracking
+
+#### **rag_service.py** (Orchestrator)
+- End-to-end pipeline:
+  1. Embed user query
+  2. Retrieve relevant chunks
+  3. Check if context is sufficient
+  4. Construct Spanish prompt with context
+  5. Generate answer via LLM
+  6. Extract citations
+  7. Log query/response
+
+---
+
+### 3. Data Layer
+
+#### **Database Models** (`src/models/`)
+
+**documents table**:
+```python
+id              UUID (PK)
+filename        VARCHAR(255)
+file_size       INTEGER
+upload_date     TIMESTAMP
+status          ENUM('uploading', 'processing', 'ready', 'failed')
+error_message   TEXT (nullable)
+total_pages     INTEGER
+total_chunks    INTEGER
+metadata        JSONB (language, encoding, etc.)
+```
+
+**chunks table**:
+```python
+id              UUID (PK)
+document_id     UUID (FK -> documents)
+content         TEXT
+embedding       VECTOR(1536)  # pgvector
+page_number     INTEGER
+chunk_index     INTEGER
+word_count      INTEGER
+created_at      TIMESTAMP
+
+INDEX: GIN index on embedding (cosine similarity)
+INDEX: document_id + chunk_index
+```
+
+**query_logs table**:
+```python
+id                  UUID (PK)
+document_id         UUID (FK -> documents)
+query_text          TEXT
+answer_text         TEXT
+retrieved_chunks    JSONB (array of chunk IDs + scores)
+is_answerable       BOOLEAN
+response_time_ms    INTEGER
+created_at          TIMESTAMP
+```
+
+#### **Repositories** (`src/repositories/`)
+
+- **document_repo.py**: CRUD operations for documents
+- **vector_repo.py**:
+  - `similarity_search(embedding, top_k, min_score)`
+  - Raw SQL with pgvector operators (`<=>`)
+  - Returns chunks ordered by relevance
+
+---
+
+### 4. Configuration (`src/core/`)
+
+#### **config.py**
+```python
+DATABASE_URL: str
+OPENAI_API_KEY: str  # or ANTHROPIC_API_KEY
+EMBEDDING_MODEL: str = "text-embedding-3-small"
+LLM_MODEL: str = "gpt-4-turbo-preview"
+CHUNK_SIZE: int = 600
+CHUNK_OVERLAP: int = 100
+TOP_K_RESULTS: int = 5
+MIN_SIMILARITY_THRESHOLD: float = 0.7
+MAX_FILE_SIZE_MB: int = 50
+ALLOWED_FILE_TYPES: list = [".pdf"]
+```
+
+#### **prompts.py**
+System prompt in Spanish:
+```
+Eres un asistente útil que responde preguntas basándose EXCLUSIVAMENTE
+en el contexto proporcionado de un documento PDF.
+
+REGLAS ESTRICTAS:
+1. Si la respuesta NO está en el contexto, responde: "Lo siento, esa
+   información no se encuentra en el documento. ¿Podrías reformular
+   tu pregunta o hacer otra relacionada con el contenido?"
+2. SIEMPRE incluye las páginas de referencia: [Página X]
+3. Responde en español claro y natural, adaptado al español chileno
+4. NO inventes información
+5. Si el contexto es insuficiente, pide más detalles
+
+CONTEXTO:
+{context}
+
+PREGUNTA: {question}
+```
+
+---
+
+## State Management
+
+### Application State
+- **Configuration**: Loaded once at startup from `.env`
+- **DB Connection Pool**: SQLAlchemy async engine (singleton)
+- **LLM Client**: Cached OpenAI/Anthropic client instance
+
+### Document Processing State
+- **Status Tracking**: `documents.status` field
+  - `uploading` → `processing` → `ready` / `failed`
+- **Progress Indicator**: Frontend polls `GET /documents/{id}/status`
+
+### Data State
+- **Document Metadata**: PostgreSQL `documents` table
+- **Vector Embeddings**: PostgreSQL `chunks` table (pgvector)
+- **Query History**: PostgreSQL `query_logs` table
+
+### No Session State
+- Stateless API (each request independent)
+- No user authentication required (demo scope)
+
+---
+
+## Service Connection Flow
+
+```
+┌─────────────┐
+│   Frontend  │
+│  (Future)   │
+└──────┬──────┘
+       │ HTTP/REST
+       ▼
+┌─────────────────────────────────────────┐
+│          FastAPI Application            │
+│                                         │
+│  ┌────────────────────────────────┐   │
+│  │  Routes (documents, queries)   │   │
+│  └───────────┬────────────────────┘   │
+│              ▼                         │
+│  ┌────────────────────────────────┐   │
+│  │   Services (RAG orchestration) │   │
+│  └───┬─────────────────────┬──────┘   │
+└──────┼─────────────────────┼──────────┘
+       │                     │
+       │ SQL                 │ HTTPS
+       ▼                     ▼
+┌──────────────┐      ┌─────────────┐
+│  PostgreSQL  │      │   LLM API   │
+│  + pgvector  │      │  (OpenAI/   │
+│              │      │  Anthropic) │
+└──────────────┘      └─────────────┘
+```
+
+### Flow Details
+
+#### **Document Upload Flow** (User Story 1)
+```
+1. User uploads PDF
+   ↓
+2. POST /documents/upload
+   ↓
+3. pdf_service validates file
+   ↓
+4. Document record created (status: 'processing')
+   ↓
+5. Background task:
+   a. Extract text (pdf_service)
+   b. Split into chunks (chunking_service)
+   c. Generate embeddings (embedding_service)
+   d. Store in DB (repositories)
+   e. Update status to 'ready'
+   ↓
+6. Frontend polls status endpoint
+   ↓
+7. "Document ready" notification
+```
+
+#### **Query Flow** (User Story 2 & 3)
+```
+1. User types question in Spanish
+   ↓
+2. POST /queries {"document_id": "...", "question": "..."}
+   ↓
+3. rag_service.answer():
+   a. Embed query (embedding_service)
+   b. Search similar chunks (retrieval_service)
+   c. Check relevance (min_similarity check)
+   ↓
+4. If relevant chunks found:
+   a. Build prompt with context (prompts.py)
+   b. Call LLM (llm_service)
+   c. Extract citations
+   d. Return answer + pages
+   ↓
+5. If no relevant chunks:
+   → Return polite refusal message (Story 3.2)
+   ↓
+6. Log query (query_logs table)
+```
+
+---
+
+## Docker Architecture
+
+### **docker-compose.yml**
+
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: rag_postgres
+    environment:
+      POSTGRES_DB: rag_db
+      POSTGRES_USER: rag_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sh:/docker-entrypoint-initdb.d/init.sh
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag_user -d rag_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: rag_api
+    command: uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+      - /app/.venv  # Prevent volume mount of venv
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://rag_user:${DB_PASSWORD}@postgres:5432/rag_db
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      EMBEDDING_MODEL: text-embedding-3-small
+      LLM_MODEL: gpt-4-turbo-preview
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+```
+
+### **Dockerfile**
+
+```dockerfile
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install system dependencies for PDF processing
+RUN apt-get update && apt-get install -y \
+    gcc \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies in a virtual environment
+RUN uv sync --frozen --no-dev
+
+# Copy application code
+COPY . .
+
+# Expose port
+EXPOSE 8000
+
+# Run migrations and start app
+CMD ["sh", "-c", "uv run alembic upgrade head && uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8000"]
+```
+
+### **scripts/init_db.sh**
+
+```bash
+#!/bin/bash
+set -e
+
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+    CREATE EXTENSION IF NOT EXISTS vector;
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+EOSQL
+```
+
+---
+
+## Key Design Decisions
+
+### 1. **Chilean Spanish Support**
+- Use multilingual embedding models
+- Spanish-specific LLM prompts
+- Test with Chilean Spanish phrases
+
+### 2. **Citation System** (User Story 2.5)
+- Chunks store page numbers
+- LLM instructed to include `[Página X]` in answers
+- Frontend can highlight source pages
+
+### 3. **Hallucination Prevention** (User Story 3.1)
+- Strict system prompt: "Answer ONLY from context"
+- Similarity threshold filtering (>0.7)
+- Out-of-scope detection: if no relevant chunks → polite refusal
+
+### 4. **Processing Feedback** (User Story 1.2)
+- Status enum: `uploading`, `processing`, `ready`, `failed`
+- Frontend polls `/documents/{id}/status` every 2s
+- Estimated time: ~30s for 50-page PDF
+
+### 5. **Error Handling** (User Story 1.4)
+```python
+- Invalid format → 400: "Solo se aceptan archivos PDF"
+- Corrupted PDF → 422: "El archivo está corrupto"
+- Oversized → 413: "Tamaño máximo: 50MB"
+- Processing failure → 500: "Error interno, intenta nuevamente"
+```
+
+### 6. **pgvector vs Dedicated Vector DB**
+- Simpler deployment (single DB)
+- Sufficient for demo (<10k documents)
+- ACID guarantees for metadata + vectors
+
+---
+
+## API Endpoints
+
+### Document Management
+
+**Upload Document**
+```http
+POST /documents/upload
+Content-Type: multipart/form-data
+
+file: <pdf_file>
+
+Response 202:
+{
+  "id": "uuid",
+  "filename": "documento.pdf",
+  "status": "processing",
+  "message": "Procesando documento..."
+}
+```
+
+**Check Status**
+```http
+GET /documents/{id}/status
+
+Response 200:
+{
+  "id": "uuid",
+  "status": "ready",  # or "processing", "failed"
+  "progress": 100,
+  "total_pages": 45,
+  "error": null
+}
+```
+
+### Querying
+
+**Ask Question**
+```http
+POST /queries
+Content-Type: application/json
+
+{
+  "document_id": "uuid",
+  "question": "¿Cuál es el objetivo del proyecto?"
+}
+
+Response 200:
+{
+  "answer": "El objetivo del proyecto es...",
+  "citations": [
+    {"page": 3, "chunk_id": "uuid", "relevance": 0.89},
+    {"page": 7, "chunk_id": "uuid", "relevance": 0.82}
+  ],
+  "is_answerable": true,
+  "response_time_ms": 1450
+}
+
+Response 200 (out-of-scope):
+{
+  "answer": "Lo siento, esa información no se encuentra en el documento. ¿Podrías reformular tu pregunta?",
+  "citations": [],
+  "is_answerable": false,
+  "response_time_ms": 650
+}
+```
+
+---
+
+## Development Workflow
+
+### Setup
+
+```bash
+# Navigate to project
+cd rag-system-demo
+
+# Install uv (if needed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create virtual environment and install dependencies
+uv sync
+
+# Setup environment
+cp .env.example .env
+# Edit .env with your OPENAI_API_KEY and DB_PASSWORD
+
+# Start Docker services
+docker-compose up -d
+
+# Wait for DB to be ready, then run migrations
+uv run alembic upgrade head
+
+# (Optional) Seed sample document
+uv run python scripts/seed_sample.py
+```
+
+### Running
+
+```bash
+# Development (hot reload)
+uv run uvicorn src.api.main:app --reload --port 8000
+
+# Or via Docker
+docker-compose up --build
+
+# Access API docs
+open http://localhost:8000/docs
+```
+
+### Testing
+
+```bash
+# Run all tests
+uv run pytest
+
+# With coverage
+uv run pytest --cov=src --cov-report=html
+
+# Test specific flow
+uv run pytest tests/integration/test_rag_flow.py -v
+
+# Manual testing
+curl -X POST http://localhost:8000/documents/upload \
+  -F "file=@sample.pdf"
+```
+
+---
+
+## Performance Considerations
+
+### Optimization Strategies
+
+1. **Embeddings**: Batch process during upload (5-10 chunks/request)
+2. **Vector Search**: GIN index on pgvector column
+3. **Caching**: Cache embeddings for common queries (Redis - future)
+4. **Async I/O**: All DB and API calls use `async/await`
+5. **Connection Pooling**: SQLAlchemy pool (min=5, max=20)
+
+### Expected Performance
+- Upload processing: ~30s for 50-page PDF
+- Query response: 1-2s (including LLM call)
+- Concurrent users: ~50 (single instance)
+
+---
+
+## Security Notes
+
+- API keys in `.env` (never committed)
+- File size validation (max 50MB)
+- File type validation (PDF only)
+- Input sanitization on queries
+- SQL injection prevention (ORM)
+- Rate limiting (future: 10 req/min per IP)
+
+---
+
+## Future Enhancements
+
+1. **Frontend**: Streamlit/React UI with drag-drop upload
+2. **Multi-document**: Query across multiple PDFs
+3. **User Auth**: Multi-tenant support with JWT
+4. **Streaming**: Server-sent events for LLM responses
+5. **Analytics**: Query patterns, popular pages
+6. **Export**: Download Q&A sessions as PDF
+7. **Language Detection**: Auto-detect document language
+
+---
+
+## Testing Strategy
+
+### Unit Tests
+- `test_pdf_service`: Extraction accuracy
+- `test_chunking_service`: Boundary preservation
+- `test_embedding_service`: Dimension validation
+- `test_prompts`: Spanish template correctness
+
+### Integration Tests
+- `test_upload_flow`: End-to-end document processing
+- `test_query_flow`: RAG pipeline with mock LLM
+- `test_out_of_scope`: Hallucination prevention
+
+### E2E Tests
+- Upload real Spanish PDF
+- Ask relevant question → verify citations
+- Ask irrelevant question → verify refusal message
+- Test Chilean Spanish phrases
+
+---
+
+## Monitoring
+
+### Logging
+- Request/response logs (FastAPI middleware)
+- Service-level logs (document processing stages)
+- Error tracking (Sentry - future)
+
+### Metrics (Future)
+- Average query response time
+- Document processing success rate
+- Top queried pages
+- Out-of-scope query ratio
+
+---
+
+## User Story Mapping to Architecture
+
+| User Story | Component | Implementation |
+|------------|-----------|----------------|
+| 1.1 - Upload PDF | `routes/documents.py` | `POST /documents/upload` |
+| 1.2 - Processing indicator | `routes/documents.py` | `GET /documents/{id}/status` with polling |
+| 1.3 - Success notification | Frontend logic | Status transition to `ready` |
+| 1.4 - Error alerts | `pdf_service.py` | Exception handling + error messages |
+| 2.1 - Text input | `routes/queries.py` | `POST /queries` |
+| 2.2 - Chilean Spanish | `prompts.py` | Spanish system prompt + multilingual embeddings |
+| 2.3 - Answer from PDF | `rag_service.py` | Context-only answering enforced |
+| 2.4 - Clear Spanish | `llm_service.py` | LLM model selection (GPT-4/Claude) |
+| 2.5 - Citations | `rag_service.py` | Page extraction from chunks |
+| 3.1 - No hallucinations | `retrieval_service.py` | Similarity threshold + prompt constraints |
+| 3.2 - Rephrase prompt | `prompts.py` | System prompt with refusal message |
+
+---
+
+## Conclusion
+
+This architecture provides a robust foundation for a Spanish-language RAG system with strong guardrails against hallucinations and clear user feedback. The modular design allows for easy testing, scaling, and future enhancements while meeting all user story requirements.
