@@ -1,5 +1,6 @@
 """Document management endpoints."""
 
+import logging
 import tempfile
 from pathlib import Path
 from typing import Annotated
@@ -7,6 +8,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from src.api.dependencies import (
     get_chunking_service,
@@ -94,6 +97,7 @@ async def upload_document(
 
             # Extract text with page numbers
             pages_text = pdf_service.extract_text_with_pages(str(temp_path))
+            logger.info(f"Extracted {len(pages_text)} pages from {file.filename}")
 
             # Clean up temp file
             temp_path.unlink()
@@ -103,6 +107,7 @@ async def upload_document(
 
             # Chunk text
             chunks_data = chunking_service.chunk_text(pages_text)
+            logger.info(f"Generated {len(chunks_data)} chunks from {file.filename}")
 
             # Generate embeddings and create chunk records
             chunk_texts = [chunk_data["content"] for chunk_data in chunks_data]

@@ -4,16 +4,20 @@ Sistema de Recuperación y Generación Aumentada (RAG) para documentos PDF en es
 
 ## Características
 
+### ✅ Sistema Completamente Funcional
 - Interfaz web moderna con React y Tailwind CSS
 - Upload de documentos con drag-and-drop
-- Chat interactivo para consultas
+- Chat interactivo para consultas RAG
 - Procesamiento de documentos PDF en español
-- Busqueda semántica con embeddings vectoriales
-- Respuestas en español chileno natural
-- Referencias de páginas en las respuestas
-- Prevención de alucinaciones (solo responde del documento)
+- Extracción de texto y chunking
+- Generación de embeddings con OpenAI
+- **Búsqueda semántica vectorial con pgvector** ✅ FUNCIONANDO
+- **Respuestas RAG con GPT-4** ✅ FUNCIONANDO
+- Almacenamiento vectorial en PostgreSQL + pgvector
 - Despliegue con Docker
 - 103 tests unitarios + integración
+
+> 💡 **Solución técnica**: La búsqueda vectorial usa psycopg2 síncrono con `register_vector()` para compatibilidad óptima con pgvector.
 
 ## Tecnologías
 
@@ -187,7 +191,7 @@ CHUNK_OVERLAP=100
 
 # Retrieval
 TOP_K_RESULTS=5
-MIN_SIMILARITY_THRESHOLD=0.5
+MIN_SIMILARITY_THRESHOLD=0.3
 ```
 
 ## Arquitectura

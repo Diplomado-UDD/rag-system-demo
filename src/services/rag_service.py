@@ -1,5 +1,6 @@
 """RAG service orchestrating the complete question-answering flow."""
 
+import logging
 from typing import Optional
 from uuid import UUID
 
@@ -7,6 +8,8 @@ from src.core.prompts import SYSTEM_PROMPT_TEMPLATE, format_context_from_chunks
 from src.services.llm_service import LLMService
 from src.services.retrieval_service import RetrievalService
 from src.utils.exceptions import RAGSystemError
+
+logger = logging.getLogger(__name__)
 
 
 class RAGResponse:
@@ -78,15 +81,21 @@ class RAGService:
             raise RAGSystemError("No se puede responder pregunta vacía")
 
         try:
+            logger.info(f"answer_question called with question='{question[:50]}...', document_id={document_id}")
+
             # Retrieve relevant chunks
+            logger.info("Calling retrieval_service.retrieve_relevant_chunks")
             chunks_with_scores = (
                 await self.retrieval_service.retrieve_relevant_chunks(
                     query=question, document_id=document_id
                 )
             )
 
+            logger.info(f"Retrieved {len(chunks_with_scores)} chunks")
+
             # Check if we found any relevant context
             if not chunks_with_scores:
+                logger.warning("No relevant chunks found for query")
                 return RAGResponse(
                     answer="Lo siento, no encontré información relevante en el documento para responder tu pregunta.",
                     is_answerable=False,

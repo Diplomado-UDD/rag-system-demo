@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     # Retrieval
     top_k_results: int = 5
-    min_similarity_threshold: float = 0.5
+    min_similarity_threshold: float = 0.3
 
     # File Upload
     max_file_size_mb: int = 50

@@ -1,13 +1,19 @@
 """Vector repository for similarity search operations."""
 
+import logging
+import os
 from typing import List, Optional
 from uuid import UUID
 
-from sqlalchemy import delete, select, text
+import psycopg2
+from pgvector.psycopg2 import register_vector
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.chunk import Chunk
 from src.repositories.base import BaseRepository
+
+logger = logging.getLogger(__name__)
 
 
 class VectorRepository(BaseRepository[Chunk]):
@@ -64,7 +70,10 @@ class VectorRepository(BaseRepository[Chunk]):
         document_id: Optional[UUID] = None,
     ) -> List[tuple[Chunk, float]]:
         """
-        Perform similarity search using cosine distance.
+        Perform similarity search using cosine distance with sync psycopg2.
+
+        Uses synchronous psycopg2 connection for vector search as it has
+        better pgvector compatibility than async drivers.
 
         Args:
             embedding: Query embedding vector
@@ -75,57 +84,84 @@ class VectorRepository(BaseRepository[Chunk]):
         Returns:
             List of (chunk, similarity_score) tuples ordered by relevance
         """
-        # Convert embedding to pgvector format
-        embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
+        logger.info(f"[SYNC] Vector search: doc_id={document_id}, min_score={min_score}, top_k={top_k}")
 
-        # Build query with cosine similarity
-        # pgvector uses <=> for cosine distance (0 = identical, 2 = opposite)
-        # Convert to similarity score: 1 - (distance / 2)
-        # Build conditional WHERE clause for optional document_id filter
-        if document_id is not None:
-            where_clause = "WHERE document_id = :doc_id"
-        else:
-            where_clause = "WHERE TRUE"
+        # Get sync connection string from async one
+        database_url = os.getenv("DATABASE_URL", "")
+        # Convert asyncpg URL to psycopg2 URL
+        sync_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
 
-        query = text(
-            f"""
-            SELECT *, 1 - (embedding <=> :embedding_vec) AS similarity
-            FROM chunks
-            {where_clause}
-              AND embedding IS NOT NULL
-              AND 1 - (embedding <=> :embedding_vec) >= :min_score
-            ORDER BY embedding <=> :embedding_vec
-            LIMIT :top_k
-            """
-        )
+        # Use sync psycopg2 for vector search
+        conn = None
+        try:
+            conn = psycopg2.connect(sync_url)
+            register_vector(conn)
 
-        # Build parameters dict, only including doc_id if provided
-        params = {
-            "embedding_vec": embedding_str,
-            "min_score": min_score,
-            "top_k": top_k,
-        }
-        if document_id is not None:
-            params["doc_id"] = document_id
+            cursor = conn.cursor()
 
-        result = await self.session.execute(query, params)
+            # Convert embedding list to string format for pgvector
+            # pgvector expects format: '[0.1,0.2,0.3,...]'
+            embedding_str = '[' + ','.join(str(x) for x in embedding) + ']'
 
-        rows = result.fetchall()
+            # Build query with optional document filter
+            if document_id is not None:
+                query = """
+                    SELECT
+                        id, document_id, content, page_number,
+                        chunk_index, word_count, created_at,
+                        1 - (embedding <=> %s::vector) AS similarity
+                    FROM chunks
+                    WHERE document_id = %s
+                      AND embedding IS NOT NULL
+                      AND 1 - (embedding <=> %s::vector) >= %s
+                    ORDER BY embedding <=> %s::vector
+                    LIMIT %s
+                """
+                params = (embedding_str, str(document_id), embedding_str, min_score, embedding_str, top_k)
+            else:
+                query = """
+                    SELECT
+                        id, document_id, content, page_number,
+                        chunk_index, word_count, created_at,
+                        1 - (embedding <=> %s::vector) AS similarity
+                    FROM chunks
+                    WHERE embedding IS NOT NULL
+                      AND 1 - (embedding <=> %s::vector) >= %s
+                    ORDER BY embedding <=> %s::vector
+                    LIMIT %s
+                """
+                params = (embedding_str, embedding_str, min_score, embedding_str, top_k)
 
-        # Convert rows to Chunk objects and extract similarity scores
-        chunks_with_scores = []
-        for row in rows:
-            chunk = Chunk(
-                id=row.id,
-                document_id=row.document_id,
-                content=row.content,
-                embedding=row.embedding,
-                page_number=row.page_number,
-                chunk_index=row.chunk_index,
-                word_count=row.word_count,
-                created_at=row.created_at,
-            )
-            similarity = float(row.similarity)
-            chunks_with_scores.append((chunk, similarity))
+            logger.info(f"[SYNC] Executing query with params: doc_id={document_id if document_id else 'all'}, min_score={min_score}, top_k={top_k}, embedding_len={len(embedding)}")
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
 
-        return chunks_with_scores
+            logger.info(f"[SYNC] Vector search returned {len(rows)} rows")
+            if len(rows) > 0:
+                logger.info(f"[SYNC] Top result similarity: {float(rows[0][7])}")
+
+            # Convert rows to Chunk objects with scores
+            chunks_with_scores = []
+            for row in rows:
+                chunk = Chunk(
+                    id=row[0],
+                    document_id=row[1],
+                    content=row[2],
+                    page_number=row[3],
+                    chunk_index=row[4],
+                    word_count=row[5],
+                    created_at=row[6],
+                )
+                similarity = float(row[7])
+                chunks_with_scores.append((chunk, similarity))
+
+            cursor.close()
+            conn.close()
+
+            return chunks_with_scores
+
+        except Exception as e:
+            logger.error(f"[SYNC] Error in vector search: {e}")
+            if conn:
+                conn.close()
+            raise
