@@ -60,7 +60,7 @@ class RetrievalService:
 
         try:
             # Generate embedding for query
-            query_embedding = await self.embedding_service.embed_text(query)
+            query_embedding = self.embedding_service.embed_text(query)
 
             # Use provided values or defaults
             k = top_k if top_k is not None else self.top_k

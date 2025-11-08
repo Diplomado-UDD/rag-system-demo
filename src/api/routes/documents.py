@@ -102,11 +102,11 @@ async def upload_document(
             document.total_pages = len(pages_text)
 
             # Chunk text
-            chunks_data = chunking_service.chunk_text_with_pages(pages_text)
+            chunks_data = chunking_service.chunk_text(pages_text)
 
             # Generate embeddings and create chunk records
             chunk_texts = [chunk_data["content"] for chunk_data in chunks_data]
-            embeddings = await embedding_service.embed_batch(chunk_texts)
+            embeddings = embedding_service.embed_batch(chunk_texts)
 
             # Create chunk objects
             chunks = []
