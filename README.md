@@ -1,4 +1,4 @@
-# Sistema RAG en Espanol
+# Sistema RAG en Español
 
 Sistema de Recuperación y Generación Aumentada (RAG) para documentos PDF en español chileno.
 
