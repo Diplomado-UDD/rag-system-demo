@@ -1,23 +1,23 @@
 # Sistema RAG en Espanol
 
-Sistema de Recuperacion y Generacion Aumentada (RAG) para documentos PDF en espanol chileno.
+Sistema de Recuperación y Generación Aumentada (RAG) para documentos PDF en español chileno.
 
-## Caracteristicas
+## Características
 
-- Procesamiento de documentos PDF en espanol
-- Busqueda semantica con embeddings vectoriales
-- Respuestas en espanol chileno natural
-- Referencias de paginas en las respuestas
-- Prevencion de alucinaciones (solo responde del documento)
+- Procesamiento de documentos PDF en español
+- Busqueda semántica con embeddings vectoriales
+- Respuestas en español chileno natural
+- Referencias de páginas en las respuestas
+- Prevención de alucinaciones (solo responde del documento)
 - Despliegue con Docker
-- 103 tests unitarios + integracion
+- 103 tests unitarios + integración
 
-## Tecnologias
+## Tecnologías
 
 - **Backend**: FastAPI + Python 3.12
 - **Base de datos**: PostgreSQL + pgvector
 - **IA**: OpenAI (embeddings + GPT-4)
-- **Gestion de dependencias**: uv
+- **Gestión de dependencias**: uv
 - **Contenedores**: Docker + docker-compose
 
 ## Requisitos
@@ -50,7 +50,7 @@ docker-compose up -d
 curl http://localhost:8000/health
 ```
 
-5. **Ver documentacion interactiva**
+5. **Ver documentación interactiva**
 ```
 http://localhost:8000/docs
 ```
@@ -124,7 +124,7 @@ curl "http://localhost:8000/documents/{document_id}/status"
 curl -X POST "http://localhost:8000/query/" \
   -H "Content-Type: application/json" \
   -d '{
-    "question": "Cual es el objetivo principal del documento?",
+    "question": "Cuál es el objetivo principal del documento?",
     "document_id": "uuid-del-documento"
   }'
 ```
@@ -141,21 +141,21 @@ curl "http://localhost:8000/documents/"
 .
 ├── src/
 │   ├── api/           # Endpoints FastAPI
-│   ├── core/          # Configuracion y prompts
+│   ├── core/          # Configuración y prompts
 │   ├── models/        # Modelos SQLAlchemy
 │   ├── repositories/  # Capa de datos
-│   ├── services/      # Logica de negocio
+│   ├── services/      # Lógica de negocio
 │   └── utils/         # Utilidades
 ├── tests/
 │   ├── unit/          # Tests unitarios
-│   └── integration/   # Tests de integracion
+│   └── integration/   # Tests de integración
 ├── alembic/           # Migraciones DB
 ├── docker-compose.yml
 ├── Dockerfile
 └── pyproject.toml
 ```
 
-## Configuracion
+## Configuración
 
 Variables de entorno clave en `.env`:
 
@@ -181,9 +181,9 @@ MIN_SIMILARITY_THRESHOLD=0.5
 
 El sistema sigue un flujo RAG clasico:
 
-1. **Ingesta**: PDF -> Extraccion -> Chunking -> Embeddings -> Vector DB
+1. **Ingesta**: PDF -> Extracción -> Chunking -> Embeddings -> Vector DB
 2. **Query**: Pregunta -> Embedding -> Busqueda -> Contexto -> LLM -> Respuesta
 
 ## Licencia
 
-MIT
+Libre
