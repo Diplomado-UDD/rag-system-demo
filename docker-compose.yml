@@ -36,6 +36,20 @@ services:
     networks:
       - rag_network
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: rag_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - app
+    networks:
+      - rag_network
+    environment:
+      - VITE_API_URL=http://localhost:8000
+
 networks:
   rag_network:
     driver: bridge

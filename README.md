@@ -145,7 +145,14 @@ curl "http://localhost:8000/documents/"
 
 ```
 .
-├── src/
+├── frontend/          # React + Vite application
+│   ├── src/
+│   │   ├── components/    # React components (Upload, List, Chat)
+│   │   ├── services/      # API client (Axios)
+│   │   └── App.jsx        # Main application
+│   ├── package.json
+│   └── vite.config.js
+├── src/               # Backend Python code
 │   ├── api/           # Endpoints FastAPI
 │   ├── core/          # Configuración y prompts
 │   ├── models/        # Modelos SQLAlchemy
@@ -153,7 +160,7 @@ curl "http://localhost:8000/documents/"
 │   ├── services/      # Lógica de negocio
 │   └── utils/         # Utilidades
 ├── tests/
-│   ├── unit/          # Tests unitarios
+│   ├── unit/          # Tests unitarios (103 tests)
 │   └── integration/   # Tests de integración
 ├── alembic/           # Migraciones DB
 ├── docker-compose.yml
