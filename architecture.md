@@ -6,13 +6,21 @@ A RAG (Retrieval-Augmented Generation) system designed to process Spanish PDF do
 
 ## Technology Stack
 
-- **Backend**: Python 3.12+
+### Frontend
+- **Framework**: React 18
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS
+- **HTTP Client**: Axios
+- **Package Manager**: npm
+
+### Backend
+- **Language**: Python 3.12+
 - **API Framework**: FastAPI
 - **Database**: PostgreSQL 16+ with pgvector extension
 - **Environment Management**: uv
 - **Containerization**: Docker & Docker Compose
-- **LLM Provider**: OpenAI/Anthropic (with Spanish language support)
-- **Embeddings**: Multilingual embeddings (e.g., `text-embedding-3-small`)
+- **LLM Provider**: OpenAI (with Spanish language support)
+- **Embeddings**: Multilingual embeddings (`text-embedding-3-small`)
 - **PDF Processing**: PyPDF2, pdfplumber
 - **Vector Search**: pgvector (cosine similarity)
 
@@ -28,20 +36,40 @@ rag-system-demo/
 ├── README.md
 ├── architecture.md              # This file
 ├── user-stories.md
-├── pyproject.toml               # uv configuration
+├── tasks.md
+├── pyproject.toml               # Backend uv configuration
 ├── uv.lock
 │
-├── docker-compose.yml           # Multi-container setup
-├── Dockerfile                   # API container
+├── docker-compose.yml           # Multi-container orchestration
+├── Dockerfile                   # Backend API container
 ├── .env.example
 ├── .env                         # Gitignored
+│
+├── frontend/                    # React web application
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── DocumentUpload.jsx
+│   │   │   ├── DocumentList.jsx
+│   │   │   └── ChatInterface.jsx
+│   │   ├── services/
+│   │   │   └── api.js           # Axios API client
+│   │   ├── App.jsx
+│   │   ├── main.jsx
+│   │   └── index.css
+│   ├── public/
+│   ├── index.html
+│   ├── package.json
+│   ├── tailwind.config.js
+│   ├── postcss.config.js
+│   ├── vite.config.js
+│   └── .env
 │
 ├── alembic/                     # DB migrations
 │   ├── versions/
 │   ├── env.py
 │   └── alembic.ini
 │
-├── src/
+├── src/                         # Backend Python code
 │   ├── __init__.py
 │   │
 │   ├── api/                     # FastAPI application
@@ -114,6 +142,65 @@ rag-system-demo/
 ---
 
 ## Component Descriptions
+
+### 0. Frontend Layer (`frontend/`)
+
+**Purpose**: User-facing web interface for document management and chat interaction
+
+#### **Components** (`src/components/`)
+
+**DocumentUpload.jsx**
+- Drag-and-drop file upload interface
+- Client-side PDF validation (type, size)
+- Upload progress indicator
+- Error display with user-friendly messages
+- Features: File preview, remove file, upload button states
+
+**DocumentList.jsx**
+- Display all uploaded documents with metadata
+- Real-time status badges (ready/processing/failed)
+- Document selection for filtered queries
+- Delete document functionality
+- Auto-refresh on new uploads
+- Visual indicators: page count, chunk count, processing state
+
+**ChatInterface.jsx**
+- Real-time chat UI with message history
+- User/assistant message bubbles
+- Loading indicators (typing animation)
+- Display query metadata (chunks retrieved, tokens used, answerability)
+- Scroll-to-bottom on new messages
+- Support for document-filtered or global queries
+
+#### **Services** (`src/services/`)
+
+**api.js**
+- Axios HTTP client configuration
+- API base URL from environment variable
+- Service modules:
+  - `documentService`: upload, getStatus, list, delete
+  - `queryService`: ask (submit questions)
+  - `healthService`: check backend health
+- Centralized error handling
+- Request/response interceptors for CORS
+
+#### **Main App** (`src/App.jsx`)
+- Root component orchestrating all features
+- State management for:
+  - Selected document ID (for filtered queries)
+  - Refresh trigger (document list updates)
+- Responsive layout (desktop: 3-column, mobile: stacked)
+- Header with connection status
+- Footer with attribution
+
+#### **Styling**
+- Tailwind CSS for utility-first styling
+- Responsive breakpoints (sm, md, lg)
+- Custom animations (pulse, bounce, spin)
+- Color palette: Blue primary, gray neutrals, status colors
+- Dark mode support (future enhancement)
+
+---
 
 ### 1. API Layer (`src/api/`)
 
@@ -309,17 +396,22 @@ PREGUNTA: {question}
 ## Service Connection Flow
 
 ```
-┌─────────────┐
-│   Frontend  │
-│  (Future)   │
-└──────┬──────┘
-       │ HTTP/REST
-       ▼
+┌───────────────────────────────────┐
+│   React Frontend (Vite + Tailwind)│
+│   - Document Upload (drag & drop) │
+│   - Document List (status)        │
+│   - Chat Interface                │
+│   Port: 5173                      │
+└──────────────┬────────────────────┘
+               │ HTTP/REST (Axios)
+               │ CORS enabled
+               ▼
 ┌─────────────────────────────────────────┐
-│          FastAPI Application            │
+│       FastAPI Backend Application       │
+│       Port: 8000                        │
 │                                         │
 │  ┌────────────────────────────────┐   │
-│  │  Routes (documents, queries)   │   │
+│  │  Routes (documents, query)     │   │
 │  └───────────┬────────────────────┘   │
 │              ▼                         │
 │  ┌────────────────────────────────┐   │
@@ -327,12 +419,12 @@ PREGUNTA: {question}
 │  └───┬─────────────────────┬──────┘   │
 └──────┼─────────────────────┼──────────┘
        │                     │
-       │ SQL                 │ HTTPS
+       │ SQL/pgvector        │ HTTPS
        ▼                     ▼
 ┌──────────────┐      ┌─────────────┐
-│  PostgreSQL  │      │   LLM API   │
-│  + pgvector  │      │  (OpenAI/   │
-│              │      │  Anthropic) │
+│  PostgreSQL  │      │  OpenAI API │
+│  + pgvector  │      │  - GPT-4    │
+│  Port: 5432  │      │  - Embeddings
 └──────────────┘      └─────────────┘
 ```
 
@@ -675,13 +767,18 @@ curl -X POST http://localhost:8000/documents/upload \
 
 ## Future Enhancements
 
-1. **Frontend**: Streamlit/React UI with drag-drop upload
-2. **Multi-document**: Query across multiple PDFs
-3. **User Auth**: Multi-tenant support with JWT
-4. **Streaming**: Server-sent events for LLM responses
-5. **Analytics**: Query patterns, popular pages
-6. **Export**: Download Q&A sessions as PDF
+1. ~~**Frontend**: React UI with drag-drop upload~~ ✅ **COMPLETED**
+2. **Multi-document Search**: Query across multiple PDFs simultaneously
+3. **User Authentication**: Multi-tenant support with JWT tokens
+4. **Streaming Responses**: Server-sent events for real-time LLM output
+5. **Analytics Dashboard**: Query patterns, popular pages, usage metrics
+6. **Export Functionality**: Download Q&A sessions as PDF/Markdown
 7. **Language Detection**: Auto-detect document language
+8. **Dark Mode**: Frontend theme switching
+9. **Document Preview**: PDF viewer with highlighted relevant pages
+10. **Advanced Filters**: Filter by date, tags, document type
+11. **Batch Upload**: Multiple document upload at once
+12. **Docker Compose for Frontend**: Add frontend to containerized stack
 
 ---
 
