@@ -1,9 +1,12 @@
 # Sistema RAG en Español
 
-Sistema de Recuperación y Generación Aumentada (RAG) para documentos PDF en español chileno.
+Sistema de Recuperación y Generación Aumentada (RAG) para documentos PDF en español chileno con interfaz web interactiva.
 
 ## Características
 
+- Interfaz web moderna con React y Tailwind CSS
+- Upload de documentos con drag-and-drop
+- Chat interactivo para consultas
 - Procesamiento de documentos PDF en español
 - Busqueda semántica con embeddings vectoriales
 - Respuestas en español chileno natural
@@ -14,10 +17,11 @@ Sistema de Recuperación y Generación Aumentada (RAG) para documentos PDF en es
 
 ## Tecnologías
 
+- **Frontend**: React + Vite + Tailwind CSS
 - **Backend**: FastAPI + Python 3.12
 - **Base de datos**: PostgreSQL + pgvector
 - **IA**: OpenAI (embeddings + GPT-4)
-- **Gestión de dependencias**: uv
+- **Gestión de dependencias**: uv (backend) + npm (frontend)
 - **Contenedores**: Docker + docker-compose
 
 ## Requisitos
@@ -45,15 +49,17 @@ cp .env.production .env
 docker-compose up -d
 ```
 
-4. **Verificar funcionamiento**
+4. **Iniciar frontend**
 ```bash
-curl http://localhost:8000/health
+cd frontend
+npm install
+npm run dev
 ```
 
-5. **Ver documentación interactiva**
-```
-http://localhost:8000/docs
-```
+5. **Acceder a la aplicacion**
+- **Interfaz web**: http://localhost:5173
+- **API docs**: http://localhost:8000/docs
+- **Health check**: http://localhost:8000/health
 
 ## Desarrollo Local
 
