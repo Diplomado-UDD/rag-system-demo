@@ -40,6 +40,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:8000
     container_name: rag_frontend
     ports:
       - "80:80"
@@ -47,8 +49,6 @@ services:
       - app
     networks:
       - rag_network
-    environment:
-      - VITE_API_URL=http://localhost:8000
 
 networks:
   rag_network:
