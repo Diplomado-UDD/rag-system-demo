@@ -81,11 +81,17 @@ class VectorRepository(BaseRepository[Chunk]):
         # Build query with cosine similarity
         # pgvector uses <=> for cosine distance (0 = identical, 2 = opposite)
         # Convert to similarity score: 1 - (distance / 2)
+        # Build conditional WHERE clause for optional document_id filter
+        if document_id is not None:
+            where_clause = "WHERE document_id = :doc_id"
+        else:
+            where_clause = "WHERE TRUE"
+
         query = text(
-            """
+            f"""
             SELECT *, 1 - (embedding <=> :embedding_vec) AS similarity
             FROM chunks
-            WHERE (:doc_id IS NULL OR document_id = :doc_id)
+            {where_clause}
               AND embedding IS NOT NULL
               AND 1 - (embedding <=> :embedding_vec) >= :min_score
             ORDER BY embedding <=> :embedding_vec
@@ -93,15 +99,16 @@ class VectorRepository(BaseRepository[Chunk]):
             """
         )
 
-        result = await self.session.execute(
-            query,
-            {
-                "embedding_vec": embedding_str,
-                "doc_id": str(document_id) if document_id else None,
-                "min_score": min_score,
-                "top_k": top_k,
-            },
-        )
+        # Build parameters dict, only including doc_id if provided
+        params = {
+            "embedding_vec": embedding_str,
+            "min_score": min_score,
+            "top_k": top_k,
+        }
+        if document_id is not None:
+            params["doc_id"] = document_id
+
+        result = await self.session.execute(query, params)
 
         rows = result.fetchall()
 
