@@ -4,6 +4,284 @@
 
 A RAG (Retrieval-Augmented Generation) system designed to process Spanish PDF documents and answer questions in Chilean Spanish. The system extracts, vectorizes, and stores document content, then uses semantic search to provide accurate, citation-backed answers while preventing hallucinations on out-of-scope queries.
 
+## Architecture Diagrams
+
+> **Note**: Estos diagramas están diseñados para ser legibles en papel tamaño carta (8.5" x 11"). Los diagramas Mermaid se renderizan automáticamente en la mayoría de visores (GitHub, GitLab, VS Code, mermaid.live). Para impresión, exporta a PDF desde un visor compatible con Mermaid para obtener el mejor resultado.
+
+### 1. System Architecture Overview
+
+```mermaid
+graph TB
+    subgraph "Frontend Layer"
+        UI[React UI<br/>Port 5173]
+        COMP1[DocumentUpload]
+        COMP2[DocumentList]
+        COMP3[ChatInterface]
+        UI --> COMP1
+        UI --> COMP2
+        UI --> COMP3
+    end
+    
+    subgraph "API Layer"
+        API[FastAPI<br/>Port 8000]
+        R1[Documents Route]
+        R2[Query Route]
+        R3[Health Route]
+        API --> R1
+        API --> R2
+        API --> R3
+    end
+    
+    subgraph "Service Layer"
+        RAG[RAG Service]
+        PDF[PDF Service]
+        CHUNK[Chunking Service]
+        EMBED[Embedding Service]
+        RET[Retrieval Service]
+        LLM[LLM Service]
+        RAG --> RET
+        RAG --> LLM
+        RET --> EMBED
+    end
+    
+    subgraph "Data Layer"
+        DB[(PostgreSQL<br/>+ pgvector<br/>Port 5433)]
+        DOC_REPO[Document Repo]
+        VEC_REPO[Vector Repo]
+        DOC_REPO --> DB
+        VEC_REPO --> DB
+    end
+    
+    subgraph "External Services"
+        OPENAI[OpenAI API<br/>GPT-4 + Embeddings]
+    end
+    
+    COMP1 -->|HTTP/REST| R1
+    COMP2 -->|HTTP/REST| R1
+    COMP3 -->|HTTP/REST| R2
+    
+    R1 --> PDF
+    R1 --> CHUNK
+    R1 --> EMBED
+    R1 --> DOC_REPO
+    R1 --> VEC_REPO
+    
+    R2 --> RAG
+    
+    EMBED --> OPENAI
+    LLM --> OPENAI
+    RET --> VEC_REPO
+    
+    style UI fill:#e1f5ff
+    style API fill:#fff4e1
+    style RAG fill:#ffe1f5
+    style DB fill:#e1ffe1
+    style OPENAI fill:#f5e1ff
+```
+
+### 2. Document Processing Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant API
+    participant PDFService
+    participant ChunkingService
+    participant EmbeddingService
+    participant DocumentRepo
+    participant VectorRepo
+    participant OpenAI
+    participant Database
+
+    User->>Frontend: Upload PDF
+    Frontend->>API: POST /documents/upload
+    API->>PDFService: Validate file
+    API->>DocumentRepo: Create document (status: processing)
+    DocumentRepo->>Database: INSERT document
+    
+    API->>PDFService: Extract text with pages
+    PDFService-->>API: Pages with text
+    
+    API->>ChunkingService: Chunk text
+    ChunkingService-->>API: Chunks with metadata
+    
+    API->>EmbeddingService: Generate embeddings
+    EmbeddingService->>OpenAI: Batch embed request
+    OpenAI-->>EmbeddingService: Embeddings (1536 dim)
+    EmbeddingService-->>API: Embeddings list
+    
+    loop For each chunk
+        API->>VectorRepo: Create chunk with embedding
+        VectorRepo->>Database: INSERT chunk
+    end
+    
+    API->>DocumentRepo: Update status to ready
+    DocumentRepo->>Database: UPDATE document
+    
+    API-->>Frontend: Document response (ready)
+    Frontend->>User: Show success notification
+```
+
+### 3. RAG Query Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant API
+    participant RAGService
+    participant RetrievalService
+    participant EmbeddingService
+    participant VectorRepo
+    participant LLMService
+    participant OpenAI
+    participant Database
+
+    User->>Frontend: Type question (Spanish)
+    Frontend->>API: POST /query/ {question, document_id}
+    
+    API->>RAGService: answer_question()
+    
+    RAGService->>RetrievalService: retrieve_relevant_chunks()
+    RetrievalService->>EmbeddingService: embed_text(query)
+    EmbeddingService->>OpenAI: Generate query embedding
+    OpenAI-->>EmbeddingService: Query embedding
+    EmbeddingService-->>RetrievalService: Embedding vector
+    
+    RetrievalService->>VectorRepo: similarity_search()
+    VectorRepo->>Database: SELECT chunks WHERE<br/>embedding <=> query_embedding<br/>ORDER BY similarity<br/>LIMIT top_k
+    Database-->>VectorRepo: Relevant chunks with scores
+    VectorRepo-->>RetrievalService: Chunks with scores
+    RetrievalService-->>RAGService: Chunks with scores
+    
+    alt Relevant chunks found
+        RAGService->>RAGService: Format context from chunks
+        RAGService->>LLMService: generate_answer(prompt)
+        LLMService->>OpenAI: GPT-4 API call<br/>(context + question + system prompt)
+        OpenAI-->>LLMService: Answer text
+        LLMService-->>RAGService: Answer + tokens
+        RAGService->>RAGService: Extract citations
+        RAGService-->>API: RAGResponse (answer, citations, is_answerable)
+    else No relevant chunks
+        RAGService-->>API: RAGResponse (polite refusal, is_answerable=false)
+    end
+    
+    API-->>Frontend: QueryResponse
+    Frontend->>User: Display answer with citations
+```
+
+### 4. Database Schema
+
+```mermaid
+erDiagram
+    DOCUMENTS ||--o{ CHUNKS : contains
+    DOCUMENTS ||--o{ QUERY_LOGS : references
+    
+    DOCUMENTS {
+        uuid id PK
+        string filename
+        integer file_size
+        timestamp upload_date
+        enum status
+        text error_message
+        integer total_pages
+        integer total_chunks
+        jsonb doc_metadata
+    }
+    
+    CHUNKS {
+        uuid id PK
+        uuid document_id FK
+        text content
+        vector embedding "1536 dimensions"
+        integer page_number
+        integer chunk_index
+        integer word_count
+        timestamp created_at
+    }
+    
+    QUERY_LOGS {
+        uuid id PK
+        uuid document_id FK
+        text query_text
+        text answer_text
+        jsonb retrieved_chunks
+        boolean is_answerable
+        integer response_time_ms
+        timestamp created_at
+    }
+```
+
+### 5. Docker Deployment Architecture
+
+```mermaid
+graph TB
+    subgraph "Docker Network: rag_network"
+        subgraph "Frontend Container"
+            FE[Frontend<br/>Nginx<br/>Port 80]
+        end
+        
+        subgraph "Backend Container"
+            BE[FastAPI App<br/>Port 8000]
+            PYTHON[Python 3.12<br/>uv + dependencies]
+        end
+        
+        subgraph "Database Container"
+            PG[PostgreSQL 16<br/>Port 5432]
+            PGVEC[pgvector extension]
+            DATA[(PostgreSQL Data<br/>Volume)]
+        end
+    end
+    
+    subgraph "External Services"
+        OPENAI_API[OpenAI API<br/>HTTPS]
+    end
+    
+    USER[User Browser] -->|HTTP| FE
+    FE -->|HTTP/REST| BE
+    BE -->|SQL/asyncpg| PG
+    BE -->|HTTPS| OPENAI_API
+    PG --> PGVEC
+    PG --> DATA
+    
+    style FE fill:#e1f5ff
+    style BE fill:#fff4e1
+    style PG fill:#e1ffe1
+    style OPENAI_API fill:#f5e1ff
+```
+
+### 6. Component Interaction Diagram
+
+```mermaid
+graph LR
+    subgraph "Upload Pipeline"
+        A[PDF Upload] --> B[PDF Service]
+        B --> C[Chunking Service]
+        C --> D[Embedding Service]
+        D --> E[Vector Repository]
+        E --> F[PostgreSQL]
+    end
+    
+    subgraph "Query Pipeline"
+        G[User Question] --> H[Embedding Service]
+        H --> I[Vector Repository]
+        I --> J[Similarity Search]
+        J --> K[RAG Service]
+        K --> L[LLM Service]
+        L --> M[OpenAI GPT-4]
+        M --> N[Answer with Citations]
+    end
+    
+    F -.->|Vector Storage| I
+    E -.->|Store Embeddings| F
+    
+    style A fill:#e1f5ff
+    style G fill:#ffe1f5
+    style F fill:#e1ffe1
+    style M fill:#f5e1ff
+```
+
 ## Technology Stack
 
 ### Frontend
@@ -395,85 +673,48 @@ PREGUNTA: {question}
 
 ## Service Connection Flow
 
-```
-┌───────────────────────────────────┐
-│   React Frontend (Vite + Tailwind)│
-│   - Document Upload (drag & drop) │
-│   - Document List (status)        │
-│   - Chat Interface                │
-│   Port: 5173                      │
-└──────────────┬────────────────────┘
-               │ HTTP/REST (Axios)
-               │ CORS enabled
-               ▼
-┌─────────────────────────────────────────┐
-│       FastAPI Backend Application       │
-│       Port: 8000                        │
-│                                         │
-│  ┌────────────────────────────────┐   │
-│  │  Routes (documents, query)     │   │
-│  └───────────┬────────────────────┘   │
-│              ▼                         │
-│  ┌────────────────────────────────┐   │
-│  │   Services (RAG orchestration) │   │
-│  └───┬─────────────────────┬──────┘   │
-└──────┼─────────────────────┼──────────┘
-       │                     │
-       │ SQL/pgvector        │ HTTPS
-       ▼                     ▼
-┌──────────────┐      ┌─────────────┐
-│  PostgreSQL  │      │  OpenAI API │
-│  + pgvector  │      │  - GPT-4    │
-│  Port: 5432  │      │  - Embeddings
-└──────────────┘      └─────────────┘
-```
+The system follows a layered architecture connecting frontend, API, services, and external dependencies. See the [System Architecture Overview](#1-system-architecture-overview) diagram above for a visual representation of component relationships.
+
+**Key Connections:**
+- **Frontend → API**: HTTP/REST requests via Axios (CORS enabled)
+- **API → Services**: Dependency injection for business logic
+- **Services → Database**: SQLAlchemy async queries to PostgreSQL with pgvector
+- **Services → OpenAI**: HTTPS API calls for embeddings and LLM generation
 
 ### Flow Details
 
-#### **Document Upload Flow** (User Story 1)
-```
-1. User uploads PDF
-   ↓
-2. POST /documents/upload
-   ↓
-3. pdf_service validates file
-   ↓
-4. Document record created (status: 'processing')
-   ↓
-5. Background task:
-   a. Extract text (pdf_service)
-   b. Split into chunks (chunking_service)
-   c. Generate embeddings (embedding_service)
-   d. Store in DB (repositories)
-   e. Update status to 'ready'
-   ↓
-6. Frontend polls status endpoint
-   ↓
-7. "Document ready" notification
-```
+For detailed flow diagrams, see:
+- [Document Processing Flow](#2-document-processing-flow) - Complete upload pipeline
+- [RAG Query Flow](#3-rag-query-flow) - Question answering pipeline
 
-#### **Query Flow** (User Story 2 & 3)
-```
+#### **Document Upload Flow Summary** (User Story 1)
+
+1. User uploads PDF via frontend
+2. Frontend sends `POST /documents/upload` to API
+3. API validates file and creates document record (status: 'processing')
+4. Processing pipeline:
+   - Extract text from PDF (PDF Service)
+   - Split into semantic chunks (Chunking Service)
+   - Generate embeddings (Embedding Service → OpenAI)
+   - Store chunks with embeddings in database (Vector Repository)
+   - Update document status to 'ready'
+5. Frontend polls status endpoint and shows success notification
+
+#### **Query Flow Summary** (User Story 2 & 3)
+
 1. User types question in Spanish
-   ↓
-2. POST /queries {"document_id": "...", "question": "..."}
-   ↓
-3. rag_service.answer():
-   a. Embed query (embedding_service)
-   b. Search similar chunks (retrieval_service)
-   c. Check relevance (min_similarity check)
-   ↓
+2. Frontend sends `POST /query/` with question and optional document_id
+3. RAG Service orchestrates:
+   - Generate query embedding (Embedding Service)
+   - Search similar chunks (Retrieval Service → Vector Repository)
+   - Check relevance threshold
 4. If relevant chunks found:
-   a. Build prompt with context (prompts.py)
-   b. Call LLM (llm_service)
-   c. Extract citations
-   d. Return answer + pages
-   ↓
-5. If no relevant chunks:
-   → Return polite refusal message (Story 3.2)
-   ↓
-6. Log query (query_logs table)
-```
+   - Format context from chunks
+   - Build prompt with Spanish system instructions
+   - Generate answer via LLM (LLM Service → OpenAI GPT-4)
+   - Extract citations and metadata
+5. If no relevant chunks: Return polite refusal message
+6. Log query and return response to frontend
 
 ---
 
