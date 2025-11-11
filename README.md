@@ -145,18 +145,21 @@ curl -X POST "http://localhost:8000/query/" \
 curl "http://localhost:8000/documents/"
 ```
 
-## Consultas a la Base de Datos
+## 🔧 Gestión y Monitoreo de la Base de Datos
 
-### Ver historial de queries
+### Consultas Básicas
+
+#### Ver historial de queries
 
 ```bash
 # Ver últimas 10 queries con detalles
 docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
 SELECT
     query_text,
+    LEFT(answer_text, 80) as respuesta_preview,
     is_answerable,
     response_time_ms,
-    JSONB_ARRAY_LENGTH(retrieved_chunks::jsonb) as chunks_used,
+    JSONB_ARRAY_LENGTH(retrieved_chunks::jsonb) as chunks_usados,
     created_at
 FROM query_logs
 ORDER BY created_at DESC
@@ -164,51 +167,211 @@ LIMIT 10;
 "
 ```
 
-### Estadísticas de uso
+#### Ver una query específica completa
 
 ```bash
-# Contar queries por tipo (respondibles vs no respondibles)
-docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
-SELECT
-    is_answerable,
-    COUNT(*) as total,
-    AVG(response_time_ms)::int as avg_time_ms
-FROM query_logs
-GROUP BY is_answerable;
-"
-
-# Ver tiempo promedio y máximo de respuesta
-docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
-SELECT
-    AVG(response_time_ms)::int as avg_time_ms,
-    MAX(response_time_ms) as max_time_ms,
-    MIN(response_time_ms) as min_time_ms
-FROM query_logs;
-"
-
-# Queries más frecuentes
+# Mostrar respuesta completa con todos los detalles
 docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
 SELECT
     query_text,
-    COUNT(*) as times_asked
+    answer_text,
+    is_answerable,
+    response_time_ms,
+    jsonb_pretty(retrieved_chunks::jsonb) AS chunks_ids
 FROM query_logs
-GROUP BY query_text
-HAVING COUNT(*) > 1
-ORDER BY times_asked DESC;
+WHERE is_answerable = true
+ORDER BY created_at DESC
+LIMIT 1;
+" -x
+```
+
+### Estadísticas y Métricas
+
+#### Resumen general del sistema
+
+```bash
+docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
+SELECT
+    (SELECT COUNT(*) FROM query_logs) as total_queries,
+    (SELECT COUNT(*) FROM query_logs WHERE is_answerable = true) as queries_respondibles,
+    (SELECT COUNT(*) FROM documents) as total_documentos,
+    (SELECT COUNT(*) FROM chunks) as total_chunks;
 "
 ```
 
-### Consultas interactivas
+#### Estadísticas de rendimiento
+
+```bash
+# Estadísticas por tipo de query
+docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
+SELECT
+    is_answerable AS respondible,
+    COUNT(*) as total_queries,
+    ROUND(AVG(response_time_ms)::numeric, 2) as tiempo_promedio_ms,
+    MIN(response_time_ms) as tiempo_min_ms,
+    MAX(response_time_ms) as tiempo_max_ms
+FROM query_logs
+GROUP BY is_answerable;
+"
+```
+
+#### Queries más lentas
+
+```bash
+docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
+SELECT
+    query_text,
+    response_time_ms,
+    is_answerable,
+    created_at
+FROM query_logs
+ORDER BY response_time_ms DESC
+LIMIT 10;
+"
+```
+
+#### Queries más frecuentes
+
+```bash
+docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
+SELECT
+    query_text,
+    COUNT(*) as veces_consultada,
+    ROUND(AVG(response_time_ms)::numeric, 2) as tiempo_promedio_ms
+FROM query_logs
+GROUP BY query_text
+HAVING COUNT(*) > 1
+ORDER BY veces_consultada DESC;
+"
+```
+
+### Gestión de Documentos
+
+#### Listar todos los documentos
+
+```bash
+docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
+SELECT
+    id,
+    filename,
+    status,
+    total_pages,
+    total_chunks,
+    upload_date
+FROM documents
+ORDER BY upload_date DESC;
+"
+```
+
+#### Ver chunks de un documento específico
+
+```bash
+# Reemplazar <document_id> con el UUID del documento
+docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
+SELECT
+    chunk_index,
+    LEFT(content, 100) as content_preview,
+    page_number
+FROM chunks
+WHERE document_id = '<document_id>'
+ORDER BY chunk_index;
+"
+```
+
+### Análisis de Uso
+
+#### Actividad por día
+
+```bash
+docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
+SELECT
+    DATE(created_at) as fecha,
+    COUNT(*) as total_queries,
+    COUNT(*) FILTER (WHERE is_answerable = true) as respondibles,
+    ROUND(AVG(response_time_ms)::numeric, 2) as tiempo_promedio_ms
+FROM query_logs
+GROUP BY DATE(created_at)
+ORDER BY fecha DESC;
+"
+```
+
+#### Búsqueda por palabra clave en queries
+
+```bash
+# Buscar queries que contengan una palabra específica
+docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
+SELECT
+    query_text,
+    is_answerable,
+    response_time_ms,
+    created_at
+FROM query_logs
+WHERE query_text ILIKE '%ciberseguridad%'
+ORDER BY created_at DESC;
+"
+```
+
+### Mantenimiento
+
+#### Limpiar queries antiguas
+
+```bash
+# Eliminar queries más antiguas de 30 días
+docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
+DELETE FROM query_logs
+WHERE created_at < NOW() - INTERVAL '30 days';
+"
+```
+
+#### Eliminar un documento y sus chunks
+
+```bash
+# PRECAUCIÓN: Esto eliminará el documento y todos sus chunks
+docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
+DELETE FROM documents WHERE id = '<document_id>';
+"
+```
+
+### Consola Interactiva
 
 ```bash
 # Entrar al psql interactivo
 docker-compose exec postgres psql -U rag_user -d rag_db
 
 # Comandos útiles dentro de psql:
-# \dt              - listar tablas
-# \d query_logs    - describir estructura de query_logs
-# \q               - salir
+# \dt                       - listar todas las tablas
+# \d query_logs             - describir estructura de query_logs
+# \d documents              - describir estructura de documents
+# \d chunks                 - describir estructura de chunks
+# \x                        - toggle formato expandido (mejor para ver respuestas largas)
+# \q                        - salir
 ```
+
+### Backup y Restore
+
+#### Crear backup
+
+```bash
+docker-compose exec -T postgres pg_dump -U rag_user rag_db > backup_$(date +%Y%m%d).sql
+```
+
+#### Restaurar backup
+
+```bash
+docker-compose exec -T postgres psql -U rag_user -d rag_db < backup_20250111.sql
+```
+
+### Persistencia de Datos
+
+Los datos persisten después de `docker-compose down` gracias al volumen nombrado `postgres_data`.
+
+Para eliminar completamente los datos (incluyendo documentos y queries):
+
+```bash
+docker-compose down -v  # La flag -v elimina los volúmenes
+```
+
+> ⚠️ **Advertencia**: El comando anterior eliminará permanentemente todos los datos almacenados.
 
 ## Estructura del Proyecto
 
