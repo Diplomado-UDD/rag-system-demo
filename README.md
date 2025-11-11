@@ -145,6 +145,71 @@ curl -X POST "http://localhost:8000/query/" \
 curl "http://localhost:8000/documents/"
 ```
 
+## Consultas a la Base de Datos
+
+### Ver historial de queries
+
+```bash
+# Ver últimas 10 queries con detalles
+docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
+SELECT
+    query_text,
+    is_answerable,
+    response_time_ms,
+    JSONB_ARRAY_LENGTH(retrieved_chunks::jsonb) as chunks_used,
+    created_at
+FROM query_logs
+ORDER BY created_at DESC
+LIMIT 10;
+"
+```
+
+### Estadísticas de uso
+
+```bash
+# Contar queries por tipo (respondibles vs no respondibles)
+docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
+SELECT
+    is_answerable,
+    COUNT(*) as total,
+    AVG(response_time_ms)::int as avg_time_ms
+FROM query_logs
+GROUP BY is_answerable;
+"
+
+# Ver tiempo promedio y máximo de respuesta
+docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
+SELECT
+    AVG(response_time_ms)::int as avg_time_ms,
+    MAX(response_time_ms) as max_time_ms,
+    MIN(response_time_ms) as min_time_ms
+FROM query_logs;
+"
+
+# Queries más frecuentes
+docker-compose exec -T postgres psql -U rag_user -d rag_db -c "
+SELECT
+    query_text,
+    COUNT(*) as times_asked
+FROM query_logs
+GROUP BY query_text
+HAVING COUNT(*) > 1
+ORDER BY times_asked DESC;
+"
+```
+
+### Consultas interactivas
+
+```bash
+# Entrar al psql interactivo
+docker-compose exec postgres psql -U rag_user -d rag_db
+
+# Comandos útiles dentro de psql:
+# \dt              - listar tablas
+# \d query_logs    - describir estructura de query_logs
+# \q               - salir
+```
+
 ## Estructura del Proyecto
 
 ```

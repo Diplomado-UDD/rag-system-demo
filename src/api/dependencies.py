@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 
 from src.core.config import get_settings
 from src.repositories.document_repo import DocumentRepository
+from src.repositories.query_log_repo import QueryLogRepository
 from src.repositories.vector_repo import VectorRepository
 from src.services.chunking_service import ChunkingService
 from src.services.embedding_service import EmbeddingService
@@ -76,6 +77,21 @@ async def get_vector_repo(
         VectorRepository instance
     """
     return VectorRepository(session)
+
+
+async def get_query_log_repo(
+    session: AsyncSession = Depends(get_db_session),
+) -> QueryLogRepository:
+    """
+    Dependency for query log repository.
+
+    Args:
+        session: Database session from get_db_session
+
+    Returns:
+        QueryLogRepository instance
+    """
+    return QueryLogRepository(session)
 
 
 def get_pdf_service() -> PDFService:
@@ -151,6 +167,8 @@ async def get_retrieval_service(
 async def get_rag_service(
     retrieval_service: RetrievalService = Depends(get_retrieval_service),
     llm_service: LLMService = Depends(get_llm_service),
+    query_log_repo: QueryLogRepository = Depends(get_query_log_repo),
+    document_repo: DocumentRepository = Depends(get_document_repo),
 ) -> RAGService:
     """
     Dependency for RAG service.
@@ -158,8 +176,15 @@ async def get_rag_service(
     Args:
         retrieval_service: Retrieval service from get_retrieval_service
         llm_service: LLM service from get_llm_service
+        query_log_repo: Query log repository from get_query_log_repo
+        document_repo: Document repository from get_document_repo
 
     Returns:
         RAGService instance
     """
-    return RAGService(retrieval_service=retrieval_service, llm_service=llm_service)
+    return RAGService(
+        retrieval_service=retrieval_service,
+        llm_service=llm_service,
+        query_log_repo=query_log_repo,
+        document_repo=document_repo,
+    )
