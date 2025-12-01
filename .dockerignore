@@ -41,7 +41,3 @@ docs/
 # Data
 postgres_data/
 *.db
-
-# Alembic (migrations run separately)
-alembic/versions/*.py
-!alembic/versions/__init__.py
