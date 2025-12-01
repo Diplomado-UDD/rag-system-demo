@@ -34,6 +34,28 @@ Sistema de Recuperación y Generación Aumentada (RAG) para documentos PDF en es
 - Python 3.12+ (para desarrollo local)
 - OpenAI API key
 
+## Puertos del Sistema
+
+El sistema utiliza los siguientes puertos:
+
+| Servicio | Puerto Host | Puerto Contenedor | Descripción |
+|----------|-------------|-------------------|-------------|
+| **Frontend (Dev)** | `5173` | - | Servidor de desarrollo Vite (npm run dev) |
+| **Frontend (Prod)** | `80` | `80` | Nginx sirviendo build de producción |
+| **Backend API** | `8000` | `8000` | FastAPI application |
+| **PostgreSQL** | `5433` | `5432` | Base de datos con pgvector |
+
+### URLs de Acceso
+
+- **Interfaz web (desarrollo)**: http://localhost:5173
+- **Interfaz web (producción)**: http://localhost
+- **API docs (Swagger)**: http://localhost:8000/docs
+- **API docs (ReDoc)**: http://localhost:8000/redoc
+- **Health check**: http://localhost:8000/health
+- **Database**: `postgresql://rag_user:rag_password@localhost:5433/rag_db`
+
+> **Nota**: El puerto 5433 se usa en el host para evitar conflictos con instalaciones locales de PostgreSQL que típicamente usan el puerto 5432.
+
 ## Inicio Rapido con Docker
 
 1. **Clonar repositorio**
@@ -420,7 +442,22 @@ CHUNK_OVERLAP=100
 # Retrieval
 TOP_K_RESULTS=5
 MIN_SIMILARITY_THRESHOLD=0.3
+
+# Puertos (opcional, para desarrollo)
+BACKEND_PORT=8000          # Puerto del servidor FastAPI
+FRONTEND_PORT=5173         # Puerto del servidor Vite dev
+DB_PORT=5433              # Puerto del host para PostgreSQL
 ```
+
+### Configuración de Puertos en Docker
+
+Los puertos se configuran en `docker-compose.yml`:
+
+- **PostgreSQL**: Mapeo `5433:5432` (host:contenedor)
+- **Backend**: Mapeo `8000:8000`
+- **Frontend**: Mapeo `80:80` (producción)
+
+Para cambiar los puertos del host, edita el archivo `docker-compose.yml` en la sección `ports` de cada servicio.
 
 ## Arquitectura
 

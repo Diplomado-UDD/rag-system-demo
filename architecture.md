@@ -304,6 +304,42 @@ graph LR
 
 ---
 
+## Network Ports and Access
+
+### Port Configuration
+
+| Service | Host Port | Container Port | Protocol | Description |
+|---------|-----------|----------------|----------|-------------|
+| **Frontend (Dev)** | 5173 | - | HTTP | Vite development server |
+| **Frontend (Prod)** | 80 | 80 | HTTP | Nginx serving production build |
+| **Backend API** | 8000 | 8000 | HTTP | FastAPI application |
+| **PostgreSQL** | 5433 | 5432 | TCP | PostgreSQL with pgvector |
+
+### Access URLs
+
+#### Development Environment
+- **Web Interface**: http://localhost:5173
+- **API Documentation (Swagger)**: http://localhost:8000/docs
+- **API Documentation (ReDoc)**: http://localhost:8000/redoc
+- **Health Check**: http://localhost:8000/health
+- **Database Connection**: `postgresql://rag_user:rag_password@localhost:5433/rag_db`
+
+#### Production Environment (Docker)
+- **Web Interface**: http://localhost
+- **API Documentation**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
+- **Database Connection** (from containers): `postgresql://rag_user:rag_password@postgres:5432/rag_db`
+
+### Port Notes
+
+> **PostgreSQL Port 5433**: The host uses port 5433 instead of the default 5432 to avoid conflicts with local PostgreSQL installations. Inside the Docker network, containers communicate using the standard port 5432.
+
+> **Frontend Ports**: Development uses Vite's default port 5173, while production uses port 80 (standard HTTP) via Nginx.
+
+> **API Port**: FastAPI runs on port 8000 in both development and production environments.
+
+---
+
 ## Project Structure
 
 ```
