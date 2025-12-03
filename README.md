@@ -75,15 +75,8 @@ cp .env.production .env
 docker-compose up -d
 ```
 
-4. **Iniciar frontend**
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-5. **Acceder a la aplicacion**
-- **Interfaz web**: http://localhost:5173
+4. **Acceder a la aplicacion**
+- **Interfaz web**: http://localhost
 - **API docs**: http://localhost:8000/docs
 - **Health check**: http://localhost:8000/health
 
