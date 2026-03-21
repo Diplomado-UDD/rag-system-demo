@@ -23,6 +23,7 @@ uv run alembic upgrade head                          # Run migrations
 
 uv run pytest                                        # All tests
 uv run pytest tests/unit/                            # Unit tests only
+uv run pytest tests/integration/                     # Integration tests (requires DB)
 uv run pytest tests/unit/test_services/test_rag_service.py -v  # Single test file
 uv run pytest --cov=src                              # With coverage
 
@@ -50,14 +51,17 @@ src/
   services/             # Business logic (pdf, chunking, embedding, retrieval, llm, rag)
   repositories/         # Async data access: document_repo, vector_repo, query_log_repo
   models/               # SQLAlchemy ORM: Document, Chunk, QueryLog
-  schemas/              # Pydantic request/response schemas
+  schemas/              # Internal Pydantic schemas (service-layer)
+  api/schemas.py        # API-boundary Pydantic schemas (request/response)
   utils/                # exceptions.py, validators.py, text_processing.py
 ```
 
 ### Key design notes
 
-- All DB/API I/O is async except `EmbeddingService` and `LLMService`, which use the synchronous `openai.OpenAI` client (OpenRouter-compatible).
+- **Two schema layers**: `src/schemas/` holds internal/service schemas; `src/api/schemas.py` holds API request/response models. Don't conflate them.
+- All DB/API I/O is async except `EmbeddingService` and `LLMService`, which use the synchronous `openai.OpenAI` client (OpenRouter-compatible). Run them in a thread pool if calling from async context.
 - Both AI services receive `api_key` + `base_url` from `Settings` — the OpenAI SDK is used as an OpenRouter proxy.
 - `dependencies.py` is the composition root: repos take `AsyncSession`, services are injected via `Depends`.
 - `get_settings()` is `lru_cache`'d — reset in tests with `get_settings.cache_clear()`.
 - RAG flow: PDF upload → chunk → embed (batch) → store vectors → query → retrieve top-k → LLM prompt → answer.
+- Chunking defaults: `chunk_size=600`, `chunk_overlap=100`; retrieval defaults: `top_k=5`, `min_similarity=0.3`. All tunable via env vars.
