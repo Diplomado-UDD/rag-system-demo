@@ -11,6 +11,7 @@ class LLMService:
     def __init__(
         self,
         api_key: str,
+        base_url: str,
         model: str = "gpt-4-turbo-preview",
         temperature: float = 0.1,
         max_tokens: int = 1000,
@@ -19,12 +20,13 @@ class LLMService:
         Initialize LLM service.
 
         Args:
-            api_key: OpenAI API key
+            api_key: OpenRouter API key
+            base_url: OpenRouter base URL
             model: Model to use for completions
             temperature: Temperature for generation (lower = more deterministic)
             max_tokens: Maximum tokens in response
         """
-        self.client = OpenAI(api_key=api_key)
+        self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens

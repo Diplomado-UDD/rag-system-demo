@@ -20,7 +20,7 @@ def mock_openai_client():
 @pytest.fixture
 def embedding_service(mock_openai_client):
     """Create EmbeddingService with mocked OpenAI client."""
-    return EmbeddingService(api_key="test-key", model="text-embedding-3-small")
+    return EmbeddingService(api_key="test-key", base_url="https://openrouter.ai/api/v1", model="text-embedding-3-small")
 
 
 def test_embed_text_returns_vector(embedding_service, mock_openai_client):
@@ -145,7 +145,7 @@ def test_embedding_service_uses_custom_model():
         mock_response.data = [Mock(embedding=[0.1])]
         mock_client.embeddings.create.return_value = mock_response
 
-        service = EmbeddingService(api_key="test", model="custom-model")
+        service = EmbeddingService(api_key="test", base_url="https://openrouter.ai/api/v1", model="custom-model")
         service.embed_text("test")
 
         mock_client.embeddings.create.assert_called_with(

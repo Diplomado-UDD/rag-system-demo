@@ -1,6 +1,7 @@
 """Application configuration using pydantic-settings."""
 
 from functools import lru_cache
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,8 +11,9 @@ class Settings(BaseSettings):
     # Database
     database_url: str
 
-    # OpenAI API
-    openai_api_key: str
+    # OpenRouter API
+    openrouter_api_key: str
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
     # Models
     embedding_model: str = "text-embedding-3-small"

@@ -100,14 +100,15 @@ class RAGService:
             log_document_id = await self._get_first_document_id()
 
         try:
-            logger.info(f"answer_question called with question='{question[:50]}...', document_id={document_id}")
+            logger.info(
+                f"answer_question called with question='{question[:50]}...', "
+                f"document_id={document_id}"
+            )
 
             # Retrieve relevant chunks
             logger.info("Calling retrieval_service.retrieve_relevant_chunks")
-            chunks_with_scores = (
-                await self.retrieval_service.retrieve_relevant_chunks(
-                    query=question, document_id=document_id
-                )
+            chunks_with_scores = await self.retrieval_service.retrieve_relevant_chunks(
+                query=question, document_id=document_id
             )
 
             logger.info(f"Retrieved {len(chunks_with_scores)} chunks")
@@ -115,7 +116,10 @@ class RAGService:
             # Check if we found any relevant context
             if not chunks_with_scores:
                 logger.warning("No relevant chunks found for query")
-                answer = "Lo siento, no encontré información relevante en el documento para responder tu pregunta."
+                answer = (
+                    "Lo siento, no encontré información relevante en el documento"
+                    " para responder tu pregunta."
+                )
                 is_answerable = False
                 chunk_ids = []
                 tokens_used = 0

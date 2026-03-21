@@ -10,15 +10,16 @@ from src.utils.exceptions import EmbeddingServiceError
 class EmbeddingService:
     """Service for generating text embeddings using OpenAI."""
 
-    def __init__(self, api_key: str, model: str = "text-embedding-3-small"):
+    def __init__(self, api_key: str, base_url: str, model: str = "text-embedding-3-small"):
         """
         Initialize embedding service.
 
         Args:
-            api_key: OpenAI API key
+            api_key: OpenRouter API key
+            base_url: OpenRouter base URL
             model: Embedding model to use
         """
-        self.client = OpenAI(api_key=api_key)
+        self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.model = model
 
     def embed_text(self, text: str) -> List[float]:

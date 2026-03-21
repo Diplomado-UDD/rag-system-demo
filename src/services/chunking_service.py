@@ -4,7 +4,7 @@ from typing import Dict, List
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from src.utils.text_processing import clean_text, count_tokens
+from src.utils.text_processing import clean_text
 
 
 class ChunkingService:

@@ -20,8 +20,8 @@ def mock_vector_repo():
 @pytest.fixture
 def mock_embedding_service():
     """Create mock embedding service."""
-    service = AsyncMock()
-    service.embed_text = AsyncMock(return_value=[0.1] * 1536)
+    service = Mock()
+    service.embed_text = Mock(return_value=[0.1] * 1536)
     return service
 
 

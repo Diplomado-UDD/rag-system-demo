@@ -62,7 +62,10 @@ class RetrievalService:
             raise RAGSystemError("No se puede buscar con consulta vacía")
 
         try:
-            logger.info(f"retrieve_relevant_chunks called with query='{query[:50]}...', document_id={document_id}")
+            logger.info(
+                f"retrieve_relevant_chunks called with query='{query[:50]}...', "
+                f"document_id={document_id}"
+            )
 
             # Generate embedding for query
             query_embedding = self.embedding_service.embed_text(query)
@@ -70,9 +73,7 @@ class RetrievalService:
 
             # Use provided values or defaults
             k = top_k if top_k is not None else self.top_k
-            min_score = (
-                min_similarity if min_similarity is not None else self.min_similarity
-            )
+            min_score = min_similarity if min_similarity is not None else self.min_similarity
 
             logger.info(f"Calling similarity_search with top_k={k}, min_score={min_score}")
 

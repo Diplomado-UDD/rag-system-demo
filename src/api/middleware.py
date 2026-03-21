@@ -53,7 +53,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 content={"detail": str(e), "error_type": "RAGSystemError"},
             )
-        except Exception as e:
+        except Exception:
             logger.exception("Unhandled exception")
             return JSONResponse(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -9,8 +9,6 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = logging.getLogger(__name__)
-
 from src.api.dependencies import (
     get_chunking_service,
     get_db_session,
@@ -32,12 +30,13 @@ from src.services.chunking_service import ChunkingService
 from src.services.embedding_service import EmbeddingService
 from src.services.pdf_service import PDFService
 from src.utils.exceptions import (
-    DocumentNotFoundError,
     FileSizeExceededError,
     InvalidFileTypeError,
     PDFProcessingError,
 )
 from src.utils.validators import validate_file_size, validate_file_type
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -89,9 +88,7 @@ async def upload_document(
 
         try:
             # Save to temporary file
-            with tempfile.NamedTemporaryFile(
-                delete=False, suffix=".pdf"
-            ) as temp_file:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
                 temp_file.write(content)
                 temp_path = Path(temp_file.name)
 
@@ -147,13 +144,9 @@ async def upload_document(
             )
 
     except InvalidFileTypeError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except FileSizeExceededError as e:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(e))
 
 
 @router.get(
@@ -169,9 +162,7 @@ async def get_document_status(
     """Get document processing status."""
     document = await document_repo.get_by_id(document_id)
     if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado")
 
     # Build progress message
     if document.status == DocumentStatus.processing:
@@ -226,9 +217,7 @@ async def delete_document(
     """Delete a document and all its chunks."""
     document = await document_repo.get_by_id(document_id)
     if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado")
 
     # Delete chunks first
     await vector_repo.delete_chunks_by_document_id(document_id)

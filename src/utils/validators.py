@@ -1,6 +1,5 @@
 """File validation utilities."""
 
-import os
 from pathlib import Path
 
 from src.utils.exceptions import FileSizeExceededError, InvalidFileTypeError
@@ -45,6 +44,5 @@ def validate_file_size(file_size: int, max_size_mb: int = 50) -> None:
     if file_size > max_size_bytes:
         actual_mb = file_size / (1024 * 1024)
         raise FileSizeExceededError(
-            f"Tamaño máximo permitido: {max_size_mb}MB. "
-            f"Archivo recibido: {actual_mb:.2f}MB"
+            f"Tamaño máximo permitido: {max_size_mb}MB. Archivo recibido: {actual_mb:.2f}MB"
         )

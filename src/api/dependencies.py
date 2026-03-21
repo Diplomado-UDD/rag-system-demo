@@ -112,9 +112,7 @@ def get_chunking_service() -> ChunkingService:
         ChunkingService instance
     """
     settings = get_settings()
-    return ChunkingService(
-        chunk_size=settings.chunk_size, chunk_overlap=settings.chunk_overlap
-    )
+    return ChunkingService(chunk_size=settings.chunk_size, chunk_overlap=settings.chunk_overlap)
 
 
 def get_embedding_service() -> EmbeddingService:
@@ -126,7 +124,9 @@ def get_embedding_service() -> EmbeddingService:
     """
     settings = get_settings()
     return EmbeddingService(
-        api_key=settings.openai_api_key, model=settings.embedding_model
+        api_key=settings.openrouter_api_key,
+        base_url=settings.openrouter_base_url,
+        model=settings.embedding_model,
     )
 
 
@@ -138,7 +138,11 @@ def get_llm_service() -> LLMService:
         LLMService instance
     """
     settings = get_settings()
-    return LLMService(api_key=settings.openai_api_key, model=settings.llm_model)
+    return LLMService(
+        api_key=settings.openrouter_api_key,
+        base_url=settings.openrouter_base_url,
+        model=settings.llm_model,
+    )
 
 
 async def get_retrieval_service(

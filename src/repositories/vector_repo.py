@@ -46,9 +46,7 @@ class VectorRepository(BaseRepository[Chunk]):
             List of chunks ordered by chunk_index
         """
         result = await self.session.execute(
-            select(Chunk)
-            .where(Chunk.document_id == document_id)
-            .order_by(Chunk.chunk_index)
+            select(Chunk).where(Chunk.document_id == document_id).order_by(Chunk.chunk_index)
         )
         return list(result.scalars().all())
 
@@ -84,7 +82,9 @@ class VectorRepository(BaseRepository[Chunk]):
         Returns:
             List of (chunk, similarity_score) tuples ordered by relevance
         """
-        logger.info(f"[SYNC] Vector search: doc_id={document_id}, min_score={min_score}, top_k={top_k}")
+        logger.info(
+            f"[SYNC] Vector search: doc_id={document_id}, min_score={min_score}, top_k={top_k}"
+        )
 
         # Get sync connection string from async one
         database_url = os.getenv("DATABASE_URL", "")
@@ -101,7 +101,7 @@ class VectorRepository(BaseRepository[Chunk]):
 
             # Convert embedding list to string format for pgvector
             # pgvector expects format: '[0.1,0.2,0.3,...]'
-            embedding_str = '[' + ','.join(str(x) for x in embedding) + ']'
+            embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
 
             # Build query with optional document filter
             if document_id is not None:
@@ -117,7 +117,14 @@ class VectorRepository(BaseRepository[Chunk]):
                     ORDER BY embedding <=> %s::vector
                     LIMIT %s
                 """
-                params = (embedding_str, str(document_id), embedding_str, min_score, embedding_str, top_k)
+                params = (
+                    embedding_str,
+                    str(document_id),
+                    embedding_str,
+                    min_score,
+                    embedding_str,
+                    top_k,
+                )
             else:
                 query = """
                     SELECT
@@ -132,7 +139,10 @@ class VectorRepository(BaseRepository[Chunk]):
                 """
                 params = (embedding_str, embedding_str, min_score, embedding_str, top_k)
 
-            logger.info(f"[SYNC] Executing query with params: doc_id={document_id if document_id else 'all'}, min_score={min_score}, top_k={top_k}, embedding_len={len(embedding)}")
+            logger.info(
+                f"[SYNC] Executing query: doc_id={document_id if document_id else 'all'}, "
+                f"min_score={min_score}, top_k={top_k}, embedding_len={len(embedding)}"
+            )
             cursor.execute(query, params)
             rows = cursor.fetchall()
 

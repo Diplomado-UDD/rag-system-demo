@@ -27,10 +27,25 @@ def mock_llm_service():
 
 
 @pytest.fixture
-def rag_service(mock_retrieval_service, mock_llm_service):
+def mock_query_log_repo():
+    """Create mock query log repository."""
+    return AsyncMock()
+
+
+@pytest.fixture
+def mock_document_repo():
+    """Create mock document repository."""
+    return AsyncMock()
+
+
+@pytest.fixture
+def rag_service(mock_retrieval_service, mock_llm_service, mock_query_log_repo, mock_document_repo):
     """Create RAG service with mocks."""
     return RAGService(
-        retrieval_service=mock_retrieval_service, llm_service=mock_llm_service
+        retrieval_service=mock_retrieval_service,
+        llm_service=mock_llm_service,
+        query_log_repo=mock_query_log_repo,
+        document_repo=mock_document_repo,
     )
 
 

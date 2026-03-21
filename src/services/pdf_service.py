@@ -1,6 +1,5 @@
 """PDF text extraction service."""
 
-from pathlib import Path
 from typing import Dict
 
 import pdfplumber
