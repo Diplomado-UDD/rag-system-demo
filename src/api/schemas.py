@@ -48,9 +48,7 @@ class QueryRequest(BaseModel):
     """Query request schema."""
 
     question: str = Field(..., min_length=1, description="Pregunta del usuario")
-    document_id: Optional[UUID] = Field(
-        None, description="ID del documento para filtrar búsqueda"
-    )
+    document_id: Optional[UUID] = Field(None, description="ID del documento para filtrar búsqueda")
 
 
 class QueryResponse(BaseModel):
@@ -60,9 +58,7 @@ class QueryResponse(BaseModel):
     is_answerable: bool = Field(
         ..., description="Indica si la pregunta pudo responderse del contexto"
     )
-    retrieved_chunks_count: int = Field(
-        ..., description="Número de fragmentos recuperados"
-    )
+    retrieved_chunks_count: int = Field(..., description="Número de fragmentos recuperados")
     tokens_used: int = Field(..., description="Tokens utilizados por el LLM")
     chunk_ids: list[UUID] = Field(..., description="IDs de los chunks utilizados")
 

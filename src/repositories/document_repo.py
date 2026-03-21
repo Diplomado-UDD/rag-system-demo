@@ -27,9 +27,7 @@ class DocumentRepository(BaseRepository[Document]):
         Returns:
             Document instance or None
         """
-        result = await self.session.execute(
-            select(Document).where(Document.filename == filename)
-        )
+        result = await self.session.execute(select(Document).where(Document.filename == filename))
         return result.scalar_one_or_none()
 
     async def update_status(
