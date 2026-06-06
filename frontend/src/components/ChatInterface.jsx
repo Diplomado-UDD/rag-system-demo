@@ -1,5 +1,20 @@
 import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { queryService } from '../services/api';
+
+function normalizeAssistantMarkdown(content) {
+    if (typeof content !== 'string') return '';
+
+    const trimmed = content.trim();
+
+    // Some model responses arrive wrapped in triple quotes; strip only the outer wrapper.
+    if (trimmed.startsWith('"""') && trimmed.endsWith('"""') && trimmed.length >= 6) {
+        return trimmed.slice(3, -3).trim();
+    }
+
+    return content;
+}
 
 export default function ChatInterface({ selectedDocumentId }) {
     const [messages, setMessages] = useState([]);
@@ -108,7 +123,15 @@ export default function ChatInterface({ selectedDocumentId }) {
                                     : 'bg-gray-100 text-gray-800'
                             }`}
                         >
-                            <p className="whitespace-pre-wrap">{message.content}</p>
+                            {message.type === 'assistant' ? (
+                                <div className="whitespace-pre-wrap break-words [&_p]:mb-3 [&_p:last-child]:mb-0 [&_strong]:font-bold [&_em]:italic [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_li]:mb-1 [&_blockquote]:border-l-4 [&_blockquote]:border-gray-400 [&_blockquote]:pl-3 [&_blockquote]:italic [&_code]:rounded [&_code]:bg-gray-200 [&_code]:px-1 [&_code]:py-0.5 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-gray-900 [&_pre]:p-3 [&_pre]:text-gray-100 [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-gray-300 [&_th]:bg-gray-200 [&_th]:p-2 [&_td]:border [&_td]:border-gray-300 [&_td]:p-2 [&_a]:text-blue-700 [&_a]:underline hover:[&_a]:text-blue-900">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        {normalizeAssistantMarkdown(message.content)}
+                                    </ReactMarkdown>
+                                </div>
+                            ) : (
+                                <p className="whitespace-pre-wrap">{message.content}</p>
+                            )}
 
                             {message.type === 'assistant' && (
                                 <div className="mt-2 pt-2 border-t border-gray-300 text-xs text-gray-600">
