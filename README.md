@@ -12,7 +12,7 @@ Sistema de Recuperación y Generación Aumentada (RAG) para documentos PDF en es
 - Extracción de texto y chunking
 - Generación de embeddings con OpenAI
 - **Búsqueda semántica vectorial con pgvector** ✅ FUNCIONANDO
-- **Respuestas RAG con GPT-4** ✅ FUNCIONANDO
+- **Respuestas RAG con LLM vía OpenRouter** ✅ FUNCIONANDO
 - Almacenamiento vectorial en PostgreSQL + pgvector
 - Despliegue con Docker
 - 103 tests unitarios + integración
@@ -24,7 +24,7 @@ Sistema de Recuperación y Generación Aumentada (RAG) para documentos PDF en es
 - **Frontend**: React + Vite + Tailwind CSS
 - **Backend**: FastAPI + Python 3.12
 - **Base de datos**: PostgreSQL + pgvector
-- **IA**: OpenAI (embeddings + GPT-4)
+- **IA**: OpenRouter (OpenAI-compatible para embeddings + LLM)
 - **Gestión de dependencias**: uv (backend) + npm (frontend)
 - **Contenedores**: Docker + docker-compose
 
@@ -32,7 +32,7 @@ Sistema de Recuperación y Generación Aumentada (RAG) para documentos PDF en es
 
 - Docker Desktop
 - Python 3.12+ (para desarrollo local)
-- OpenAI API key
+- OpenRouter API key
 
 ## Puertos del Sistema
 
@@ -67,7 +67,7 @@ cd rag-system-demo
 2. **Configurar variables de entorno**
 ```bash
 cp .env.production .env
-# Editar .env con tu OpenAI API key
+# Editar .env con tu OpenRouter API key
 ```
 
 3. **Iniciar servicios**
@@ -100,7 +100,7 @@ docker-compose up -d postgres
 4. **Configurar .env**
 ```bash
 cp .env.example .env
-# Editar DATABASE_URL y OPENAI_API_KEY
+# Editar DATABASE_URL y OPENROUTER_API_KEY
 ```
 
 5. **Ejecutar migraciones**
@@ -112,6 +112,19 @@ uv run alembic upgrade head
 ```bash
 uv run uvicorn src.main:app --reload
 ```
+
+7. **Iniciar frontend (desarrollo)**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+8. **Acceder a la aplicación**
+- **Frontend dev**: http://localhost:5173
+- **API docs**: http://localhost:8000/docs
+
+> **Importante**: `uv run uvicorn src.main:app --reload` solo inicia el backend (API). Para que `http://localhost` (puerto 80) responda, debes iniciar el frontend en Docker (`docker-compose up -d frontend`) o usar el frontend dev en `http://localhost:5173`.
 
 ## Ejecutar Tests
 
@@ -423,10 +436,10 @@ Variables de entorno clave en `.env`:
 # Base de datos
 DATABASE_URL=postgresql+asyncpg://rag_user:password@localhost:5433/rag_db
 
-# OpenAI
-OPENAI_API_KEY=sk-...
+# OpenRouter
+OPENROUTER_API_KEY=sk-or-...
 EMBEDDING_MODEL=text-embedding-3-small
-LLM_MODEL=gpt-4-turbo-preview
+LLM_MODEL=~openai/gpt-latest
 
 # Chunking
 CHUNK_SIZE=600
