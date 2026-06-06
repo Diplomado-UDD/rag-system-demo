@@ -10,7 +10,7 @@ def test_settings_loads_from_env(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://test:test@localhost/test")
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
 
-    settings = Settings()
+    settings = Settings(_env_file=None)
 
     assert settings.database_url == "postgresql://test:test@localhost/test"
     assert settings.openrouter_api_key == "test-key"
@@ -22,10 +22,11 @@ def test_settings_has_default_values(monkeypatch):
     """Test that Settings has sensible default values."""
     monkeypatch.setenv("DATABASE_URL", "postgresql://test:test@localhost/test")
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.delenv("LLM_MODEL", raising=False)
 
-    settings = Settings()
+    settings = Settings(_env_file=None)
 
     assert settings.embedding_model == "text-embedding-3-small"
-    assert settings.llm_model == "gpt-4-turbo-preview"
+    assert settings.llm_model == "~openai/gpt-latest"
     assert settings.top_k_results == 5
     assert settings.min_similarity_threshold == 0.3

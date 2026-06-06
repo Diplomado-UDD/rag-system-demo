@@ -12,7 +12,7 @@ class LLMService:
         self,
         api_key: str,
         base_url: str,
-        model: str = "gpt-4-turbo-preview",
+        model: str = "~openai/gpt-latest",
         temperature: float = 0.1,
         max_tokens: int = 1000,
     ):

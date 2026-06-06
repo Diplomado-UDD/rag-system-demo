@@ -20,7 +20,7 @@ def mock_openai_client():
 @pytest.fixture
 def llm_service(mock_openai_client):
     """Create LLMService with mocked OpenAI client."""
-    return LLMService(api_key="test-key", base_url="https://openrouter.ai/api/v1", model="gpt-4-turbo-preview")
+    return LLMService(api_key="test-key", base_url="https://openrouter.ai/api/v1", model="~openai/gpt-latest")
 
 
 def test_generate_answer_returns_text_and_tokens(llm_service, mock_openai_client):
@@ -47,7 +47,7 @@ def test_generate_answer_calls_api_with_correct_params(llm_service, mock_openai_
     llm_service.generate_answer("Test prompt")
 
     mock_openai_client.chat.completions.create.assert_called_once_with(
-        model="gpt-4-turbo-preview",
+        model="~openai/gpt-latest",
         messages=[{"role": "user", "content": "Test prompt"}],
         temperature=0.1,
         max_tokens=1000,
@@ -101,14 +101,14 @@ def test_llm_service_uses_custom_parameters():
         service = LLMService(
             api_key="test",
             base_url="https://openrouter.ai/api/v1",
-            model="gpt-3.5-turbo",
+            model="openai/gpt-chat-latest",
             temperature=0.5,
             max_tokens=500,
         )
         service.generate_answer("test")
 
         mock_client.chat.completions.create.assert_called_with(
-            model="gpt-3.5-turbo",
+            model="openai/gpt-chat-latest",
             messages=[{"role": "user", "content": "test"}],
             temperature=0.5,
             max_tokens=500,

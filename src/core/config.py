@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     # Models
     embedding_model: str = "text-embedding-3-small"
-    llm_model: str = "gpt-4-turbo-preview"
+    llm_model: str = "~openai/gpt-latest"
 
     # Chunking
     chunk_size: int = 600
