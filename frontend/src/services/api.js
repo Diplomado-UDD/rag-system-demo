@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8000';
 
 async function request(path, options = {}) {
     const res = await fetch(`${BASE_URL}${path}`, options);
@@ -8,7 +8,18 @@ async function request(path, options = {}) {
         err.response = { data: error };
         throw err;
     }
-    return res.json();
+
+    if (res.status === 204) {
+        return undefined;
+    }
+
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+        return undefined;
+    }
+
+    const body = await res.text();
+    return body ? JSON.parse(body) : undefined;
 }
 
 export const documentService = {

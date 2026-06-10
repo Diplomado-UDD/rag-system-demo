@@ -50,15 +50,17 @@ class VectorRepository(BaseRepository[Chunk]):
         )
         return list(result.scalars().all())
 
-    async def delete_chunks_by_document_id(self, document_id: UUID) -> None:
+    async def delete_chunks_by_document_id(self, document_id: UUID, commit: bool = True) -> None:
         """
         Delete all chunks for a document.
 
         Args:
             document_id: Document UUID
+            commit: Whether to commit immediately
         """
         await self.session.execute(delete(Chunk).where(Chunk.document_id == document_id))
-        await self.session.commit()
+        if commit:
+            await self.session.commit()
 
     async def similarity_search(
         self,

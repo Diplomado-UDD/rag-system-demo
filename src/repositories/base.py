@@ -66,15 +66,17 @@ class BaseRepository(Generic[ModelType]):
         await self.session.refresh(entity)
         return entity
 
-    async def delete(self, entity: ModelType) -> None:
+    async def delete(self, entity: ModelType, commit: bool = True) -> None:
         """
         Delete entity.
 
         Args:
             entity: Entity to delete
+            commit: Whether to commit immediately
         """
         await self.session.delete(entity)
-        await self.session.commit()
+        if commit:
+            await self.session.commit()
 
     async def list_all(self, limit: int = 100) -> list[ModelType]:
         """

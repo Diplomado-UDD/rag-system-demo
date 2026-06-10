@@ -219,10 +219,16 @@ async def delete_document(
     if not document:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado")
 
-    # Delete chunks first
-    await vector_repo.delete_chunks_by_document_id(document_id)
+    session = document_repo.session
 
-    # Delete document
-    await document_repo.delete(document)
+    try:
+        # Delete chunks and document in a single transaction boundary.
+        await vector_repo.delete_chunks_by_document_id(document_id, commit=False)
+        await document_repo.delete(document, commit=False)
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        logger.exception("Failed to delete document %s", document_id)
+        raise
 
     return None
