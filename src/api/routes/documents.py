@@ -15,6 +15,7 @@ from src.api.dependencies import (
     get_document_repo,
     get_embedding_service,
     get_pdf_service,
+    get_query_log_repo,
     get_vector_repo,
 )
 from src.api.schemas import (
@@ -25,6 +26,7 @@ from src.api.schemas import (
 from src.models.chunk import Chunk
 from src.models.document import Document, DocumentStatus
 from src.repositories.document_repo import DocumentRepository
+from src.repositories.query_log_repo import QueryLogRepository
 from src.repositories.vector_repo import VectorRepository
 from src.services.chunking_service import ChunkingService
 from src.services.embedding_service import EmbeddingService
@@ -213,8 +215,9 @@ async def delete_document(
     document_id: UUID,
     document_repo: Annotated[DocumentRepository, Depends(get_document_repo)],
     vector_repo: Annotated[VectorRepository, Depends(get_vector_repo)],
+    query_log_repo: Annotated[QueryLogRepository, Depends(get_query_log_repo)],
 ):
-    """Delete a document and all its chunks."""
+    """Delete a document and all its chunks and query logs."""
     document = await document_repo.get_by_id(document_id)
     if not document:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado")
@@ -222,7 +225,8 @@ async def delete_document(
     session = document_repo.session
 
     try:
-        # Delete chunks and document in a single transaction boundary.
+        # Delete dependents and document in a single transaction boundary.
+        await query_log_repo.delete_by_document_id(document_id, commit=False)
         await vector_repo.delete_chunks_by_document_id(document_id, commit=False)
         await document_repo.delete(document, commit=False)
         await session.commit()

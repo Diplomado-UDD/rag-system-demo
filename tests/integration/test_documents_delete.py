@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from src.api.dependencies import get_document_repo, get_vector_repo
+from src.api.dependencies import get_document_repo, get_query_log_repo, get_vector_repo
 from src.main import app
 from src.models.document import Document, DocumentStatus
 
@@ -53,19 +53,34 @@ class DummyVectorRepo:
         self.deleted_document_id = document_id
 
 
+class DummyQueryLogRepo:
+    """Query log repository stub for delete route tests."""
+
+    def __init__(self, session: DummySession):
+        self.session = session
+        self.deleted_document_id = None
+
+    async def delete_by_document_id(self, document_id, commit: bool = True):
+        self.deleted_document_id = document_id
+
+
 @pytest.fixture
 async def delete_client():
     """Provide a helper that mounts repo overrides for delete tests."""
 
-    async def _make_client(document_repo, vector_repo):
+    async def _make_client(document_repo, vector_repo, query_log_repo):
         async def override_get_document_repo():
             return document_repo
 
         async def override_get_vector_repo():
             return vector_repo
 
+        async def override_get_query_log_repo():
+            return query_log_repo
+
         app.dependency_overrides[get_document_repo] = override_get_document_repo
         app.dependency_overrides[get_vector_repo] = override_get_vector_repo
+        app.dependency_overrides[get_query_log_repo] = override_get_query_log_repo
 
         return AsyncClient(transport=ASGITransport(app=app), base_url='http://test')
 
@@ -86,12 +101,14 @@ async def test_delete_document_returns_204_and_commits_once(delete_client):
     )
     document_repo = DummyDocumentRepo(document=document, session=session)
     vector_repo = DummyVectorRepo(session=session)
+    query_log_repo = DummyQueryLogRepo(session=session)
 
-    async with await delete_client(document_repo, vector_repo) as client:
+    async with await delete_client(document_repo, vector_repo, query_log_repo) as client:
         response = await client.delete(f'/documents/{document_id}')
 
     assert response.status_code == 204
     assert response.text == ''
+    assert query_log_repo.deleted_document_id == document_id
     assert vector_repo.deleted_document_id == document_id
     assert document_repo.deleted_document == document
     assert session.commit_calls == 1
@@ -105,12 +122,14 @@ async def test_delete_document_returns_404_when_missing(delete_client):
     session = DummySession()
     document_repo = DummyDocumentRepo(document=None, session=session)
     vector_repo = DummyVectorRepo(session=session)
+    query_log_repo = DummyQueryLogRepo(session=session)
 
-    async with await delete_client(document_repo, vector_repo) as client:
+    async with await delete_client(document_repo, vector_repo, query_log_repo) as client:
         response = await client.delete(f'/documents/{document_id}')
 
     assert response.status_code == 404
     assert response.json()['detail'] == 'Documento no encontrado'
+    assert query_log_repo.deleted_document_id is None
     assert vector_repo.deleted_document_id is None
     assert session.commit_calls == 0
 
@@ -128,12 +147,14 @@ async def test_delete_document_rolls_back_when_delete_fails(delete_client):
     )
     document_repo = DummyDocumentRepo(document=document, session=session, fail_on_delete=True)
     vector_repo = DummyVectorRepo(session=session)
+    query_log_repo = DummyQueryLogRepo(session=session)
 
-    async with await delete_client(document_repo, vector_repo) as client:
+    async with await delete_client(document_repo, vector_repo, query_log_repo) as client:
         response = await client.delete(f'/documents/{document_id}')
 
     assert response.status_code == 500
     assert response.json()['detail'] == 'Error interno del servidor'
+    assert query_log_repo.deleted_document_id == document_id
     assert vector_repo.deleted_document_id == document_id
     assert session.commit_calls == 0
     assert session.rollback_calls == 1
